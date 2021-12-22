@@ -7,37 +7,51 @@ import (
 )
 
 /*
-A real RealPolynomial is represented as a sum of increasing
-degrees of a x.
+A real RealPolynomial is represented as a slice of coefficients ordered increasingly by degree.
 
 For example:
-5x^0 + 4x^1 + (-2)x^2 + ...
+5 x^0 + 4 x^1 + (-2) x^2 + ...
 */
 type RealPolynomial struct {
-	// Store coefficients in a slice of floats.
 	coeffs []float64
 }
 
-// --- BEGIN GLOBAL CONSTS ---
-const globalNewtonIterations = 100
+/* --- BEGIN GLOBAL SETTINGS --- */
+var globalNewtonIterations = 100
 
-// ---
+/* --- END GLOBAL SETTINGS --- */
 
-// --- BEGIN STRUCT METHODS ---
+/* --- BEGIN STRUCT METHODS --- */
 
+/*
+Returns the number of coefficients of the current instance.
+*/
 func (rp *RealPolynomial) NumCoeffs() int {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
 	return len(rp.coeffs)
-
 }
 
+/*
+Returns the int degree of the current instance.
+*/
 func (rp *RealPolynomial) Degree() int {
+	if rp == nil {
+		panic("received nil RealPolynomial")
+	}
 	// Coefficients should be maintained in such a way that allow the
 	// number of coefficients to be one less than the degree of the polynomial.
 	return rp.NumCoeffs() - 1
 }
 
-// Evaluates the RealPolynomial at x and returns the computed value.
+/*
+Returns the float64 value of the current instance evaluated at x.
+*/
 func (rp *RealPolynomial) At(x float64) float64 {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
 	var out float64 // Zero value 0.0
 	for d, c := range rp.coeffs {
 		out += c * math.Pow(x, float64(d))
@@ -45,16 +59,18 @@ func (rp *RealPolynomial) At(x float64) float64 {
 	return out
 }
 
-// Returns the a pointer to the RealPolynomial derivative of the current instance of RealPolynomial.
-func (rp *RealPolynomial) Derivative() (*RealPolynomial, error) {
+/*
+Returns the derivative of the current instance.
+*/
+func (rp *RealPolynomial) Derivative() *RealPolynomial {
 	if rp == nil {
-		return nil, errors.New("RealPolynomial instance cannot be nil")
+		panic("received nil *RealPolynomial")
 	}
-
 	// In the case that the polynomial is constant, the derivative has the same number of terms.
 	// We deal with this case knowing that the derivative of any real constant is 0.
 	if rp.Degree() == 0 {
-		return NewRealPolynomial([]float64{0})
+		deriv, _ := NewRealPolynomial([]float64{0}) // safe call
+		return deriv
 	}
 
 	nDerivativeCoeffs := len(rp.coeffs) - 1
@@ -63,23 +79,46 @@ func (rp *RealPolynomial) Derivative() (*RealPolynomial, error) {
 		derivativeCoeffs[i] = rp.coeffs[i+1] * float64(i+1)
 	}
 
-	return NewRealPolynomial(derivativeCoeffs)
+	deriv, _ := NewRealPolynomial(derivativeCoeffs) // safe call
+	return deriv
 }
 
+/*
+Returns the float64 coefficient of the highest degree term of the current instance.
+*/
 func (rp *RealPolynomial) LeadCoeff() float64 {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
 	return rp.coeffs[len(rp.coeffs)-1]
 }
 
+/*
+Returns a RealPolynomial which has been multiplied by x^offset.
+*/
 func (rp *RealPolynomial) ShiftRight(offset int) *RealPolynomial {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+	if offset < 0 {
+		panic("invalid offset")
+	}
 	shiftedCoeffs := make([]float64, rp.NumCoeffs()+offset)
 	for i, c := range rp.coeffs {
 		shiftedCoeffs[i+offset] = c
 	}
-	rp, _ = NewRealPolynomial(shiftedCoeffs)
+	rp, _ = NewRealPolynomial(shiftedCoeffs) // safe call
 	return rp
 }
 
+/*
+Checks if the current instance is equal to the RealPolynomial input and returns true if so. Otherwise, false is returned.
+*/
 func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
+	if rp1 == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
 	if rp1.NumCoeffs() != rp2.NumCoeffs() {
 		return false
 	}
@@ -93,8 +132,24 @@ func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
 	return true
 }
 
-// Adds rp2 to the current instance and returns the sum.
+/*
+Checks if the current instance is equal to the zero RealPolynomial (only one coefficient of 0). Otherwise, false is returned.
+*/
+func (rp *RealPolynomial) IsZero() bool {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+	return rp.Degree() == 0 && rp.coeffs[0] == 0.0
+}
+
+/*
+Adds the current instance and the RealPolynomial input and returns the sum. The current instance is also set to the sum.
+*/
 func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
+	if rp1 == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
 	var maxNumCoeffs int
 
 	// Pad "shorter" polynomial with 0s.
@@ -124,8 +179,14 @@ func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// Subtracts rp2 to the current instance and returns the difference.
+/*
+Subtracts the current instance and the RealPolynomial input and returns the difference. The current instance is also set to the difference.
+*/
 func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
+	if rp1 == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
 	var maxNumCoeffs int
 
 	// Pad "shorter" polynomial with 0s.
@@ -154,8 +215,14 @@ func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// Multiplies rp2 with the current instance and returns the product.
+/*
+Multiplies the current instance and the RealPolynomial input and returns the product. The current instance is also set to the product.
+*/
 func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
+	if rp1 == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
 	prodCoeffs := make([]float64, rp1.Degree()+rp2.Degree()+1)
 
 	for i := 0; i < rp1.NumCoeffs(); i++ {
@@ -169,7 +236,9 @@ func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// Multiplies scalar s with the current instance and returns the product.
+/*
+Multiplies the current instance and the float64 input and returns the product. The current instance is also set to the product.
+*/
 func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
 	for i := 0; i < len(rp.coeffs); i++ {
 		rp.coeffs[i] *= s
@@ -177,8 +246,17 @@ func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
 	return rp
 }
 
-// Divides the current instance by rp2 and returns the quotient and remainder.
+/*
+Divides the current instance by the RealPolynomial input and returns the result as a quotient, remainder pair. The current instance is also set to the quotient.
+*/
 func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *RealPolynomial) {
+	if rp1 == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
+	if rp2.IsZero() {
+		panic("RealPolynomial division by zero")
+	}
 
 	// Using special properties of the ordered coefficient system, we can divide polynomials
 	// via shifts:
@@ -200,18 +278,26 @@ func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *
 		rem.Sub(d)
 	}
 
-	//rp1.coeffs = quotCoeffs
+	rp1.coeffs = quotCoeffs
 	return rp1, &rem
 }
 
-// Returns the number of roots on the closed interval [a, b].
-func (rp *RealPolynomial) CountRootsWithin(a, b float64) (int, error) {
+/*
+Returns the int number of roots of the current instance on the closed interval [a, b].
+
+Note: if there are an infinite amount of roots, -1 is returned.
+*/
+func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 	if rp == nil {
-		return 0, errors.New("instance cannot be nil")
+		panic("received nil *RealPolynomial")
+	}
+
+	if a > b {
+		panic("invalid interval")
 	}
 
 	if rp.Degree() == 0 && rp.coeffs[0] == 0.0 {
-		return 0, errors.New("infinite number of roots on the provided interval")
+		return -1
 	}
 
 	// Implement Sturm's Theorem
@@ -220,14 +306,15 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) (int, error) {
 	var sturmChain []*RealPolynomial
 	sturmChain = append(sturmChain, rp)
 
-	deriv, _ := rp.Derivative()
+	deriv := rp.Derivative()
 	sturmChain = append(sturmChain, deriv)
 
 	for i := 1; i < rp.Degree(); i++ {
 		if sturmChain[i].Degree() == 0 {
 			break
 		}
-		_, rem := sturmChain[i-1].EuclideanDiv(sturmChain[i])
+		tmp := sturmChain[i-1]
+		_, rem := tmp.EuclideanDiv(sturmChain[i])
 		sturmChain = append(sturmChain, rem.MulS(-1))
 	}
 
@@ -240,35 +327,31 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) (int, error) {
 	}
 
 	halfOpenCount := countSignVariations(seqA) - countSignVariations(seqB)
-	if rp.At(a) == 0.0 { // Manually check open interval
-		return halfOpenCount + 1, nil
+	if rp.At(a) == 0.0 { // Manually check open lower bound
+		return halfOpenCount + 1
 	} else {
-		return halfOpenCount, nil
+		return halfOpenCount
 	}
 }
 
 /*
-FindRootWithin(a, b float64) returns a float64 root (out of potentially many) of the
-current instance on the closed interval [a, b].
+Returns any float64 root of the current instance existing on the closed interval [a, b].
 
-Examples:
->>> NewRealPolynomial([]float64{0, 1}).FindRootWithin(-1, 1)
-0.0
-
+Note: if there are no roots on the provided interval, an error is set.
 */
 func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 	if rp == nil {
-		return 0, errors.New("instance cannot be nil")
+		panic("received nil *RealPolynomial")
 	}
 
-	nRootsWithin, err := rp.CountRootsWithin(a, b)
-
-	if err != nil { //
-		return 0, nil
-	}
+	nRootsWithin := rp.CountRootsWithin(a, b)
 
 	if nRootsWithin == 0 {
-		return 0, errors.New("the polynomial has no solutions in the provided interval")
+		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
+	}
+
+	if nRootsWithin < 0 { // Infinite amount of roots
+		return 0.0, nil
 	}
 
 	// Implement Newton's Method
@@ -277,10 +360,7 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 	guess := (lower + upper) / 2
 
 	for i := 0; i < globalNewtonIterations; i++ {
-		deriv, err = rp.Derivative() // rp is not nil. This is a safe call.
-		if err != nil {
-			fmt.Printf("error: %v\n", err)
-		}
+		deriv = rp.Derivative()
 		guess -= rp.At(guess) / deriv.At(guess)
 	}
 
@@ -329,8 +409,14 @@ func (rp *RealPolynomial) FindRootsBestAttempt() {
 	// 	return solutions, nSolutions
 }
 
-// Returns a string expression of the polynomial in increasing sum form.
+/*
+Returns a string representation of the current instance in increasing sum form.
+*/
 func (rp *RealPolynomial) Expr() string {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+
 	var expr string
 	for d, c := range rp.coeffs {
 		if d == len(rp.coeffs)-1 {
@@ -343,8 +429,14 @@ func (rp *RealPolynomial) Expr() string {
 	return expr + "\n"
 }
 
-// Prints the string expression of the polynomial in increasing sum form to standard output.
+/*
+Prints the string expression of the polynomial in increasing sum form to standard output.
+*/
 func (rp *RealPolynomial) PrintExpr() {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+
 	fmt.Print(rp.Expr())
 }
 
@@ -352,6 +444,7 @@ func (rp *RealPolynomial) PrintExpr() {
 
 // --- BEGIN UTILITY FUNCTIONS ---
 
+// Strip all leading zeroes in the slice s. If the entire slice is filled with 0, the first element will be kept.
 func stripTailingZeroes(s []float64) []float64 {
 	for s[len(s)-1] == 0.0 && len(s) > 1 {
 		s = s[:len(s)-1]
@@ -359,6 +452,7 @@ func stripTailingZeroes(s []float64) []float64 {
 	return s
 }
 
+// Counts sign variations in s: https://en.wikipedia.org/wiki/Budan%27s_theorem#Sign_variation
 func countSignVariations(s []float64) int {
 	// Filter zeroes in s.
 	var filtered []float64
@@ -379,7 +473,9 @@ func countSignVariations(s []float64) int {
 	return count
 }
 
-// Initializes and returns a new RealPolynomial struct with the given coefficients.
+/*
+Initializes and returns a new RealPolynomial struct with the given coefficients.
+*/
 func NewRealPolynomial(coeffs []float64) (*RealPolynomial, error) {
 	if len(coeffs) == 0 {
 		return nil, errors.New("cannot create polynomial with no coefficients")
@@ -389,6 +485,17 @@ func NewRealPolynomial(coeffs []float64) (*RealPolynomial, error) {
 	newPolynomial.coeffs = stripTailingZeroes(coeffs)
 
 	return &newPolynomial, nil
+}
+
+/*
+Set the number of iterations that Newton's Method will use in root finding functions.
+*/
+func SetNewtonIterations(n int) error {
+	if n < 0 {
+		return errors.New("cannot set negative iterations for Newton's Method")
+	}
+	globalNewtonIterations = n
+	return nil
 }
 
 // --- END UTILITY FUNCTIONS ---

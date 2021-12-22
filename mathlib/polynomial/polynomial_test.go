@@ -3,6 +3,7 @@ package polynomial_test
 import (
 	"fmt"
 	"main/mathlib/polynomial"
+	"math"
 	"testing"
 )
 
@@ -11,11 +12,7 @@ var Cons1, Cons2, Line1, Line2, Quad1, Quad2, Cube1 *polynomial.RealPolynomial
 func init() {
 	// Testing polynomials
 	var err error
-	Cons1, err = polynomial.NewRealPolynomial([]float64{0})
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		return
-	}
+
 	Cons2, err = polynomial.NewRealPolynomial([]float64{18})
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -59,11 +56,8 @@ func TestFindRootWithin(t *testing.T) {
 }
 
 func TestCountRoots(t *testing.T) {
-	nRoots, err := Cons1.CountRootsWithin(-5, 5)
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		return
-	}
+	nRoots := Cons1.CountRootsWithin(-5, 5)
+	math.Inf(1)
 	Cons1.PrintExpr()
 	fmt.Printf("Number of roots: %d\n", nRoots)
 }
