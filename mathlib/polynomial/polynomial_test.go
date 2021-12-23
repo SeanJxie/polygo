@@ -46,8 +46,8 @@ func init() {
 }
 
 func TestFindRootWithin(t *testing.T) {
-	root, err := Cons1.FindRootWithin(-5, 5)
-	Cons1.PrintExpr()
+	root, err := Quad2.FindRootWithin(-5, 5)
+	Quad2.PrintExpr()
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
@@ -56,8 +56,8 @@ func TestFindRootWithin(t *testing.T) {
 }
 
 func TestCountRoots(t *testing.T) {
-	nRoots := Cons1.CountRootsWithin(-5, 5)
+	nRoots := Quad2.CountRootsWithin(-5, 5)
 	math.Inf(1)
-	Cons1.PrintExpr()
+	Quad2.PrintExpr()
 	fmt.Printf("Number of roots: %d\n", nRoots)
 }

@@ -304,6 +304,7 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 
 	// Generate Sturm chain
 	var sturmChain []*RealPolynomial
+	var tmp, rem *RealPolynomial
 	sturmChain = append(sturmChain, rp)
 
 	deriv := rp.Derivative()
@@ -313,8 +314,8 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 		if sturmChain[i].Degree() == 0 {
 			break
 		}
-		tmp := sturmChain[i-1]
-		_, rem := tmp.EuclideanDiv(sturmChain[i])
+		tmp = sturmChain[i-1]
+		_, rem = tmp.EuclideanDiv(sturmChain[i])
 		sturmChain = append(sturmChain, rem.MulS(-1))
 	}
 
