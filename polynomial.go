@@ -3,7 +3,6 @@ package polynomial
 import (
 	"errors"
 	"fmt"
-	"math"
 )
 
 /*
@@ -54,9 +53,9 @@ func (rp *RealPolynomial) At(x float64) float64 {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
 	}
-	length := len(rp.coeffs) - 1
-	out := rp.coeffs[length]
-	for i := length; i >= 0; i-- {
+	length := len(rp.coeffs)
+	out := rp.coeffs[length-1]
+	for i := length - 2; i >= 0; i-- {
 		out = out*x + rp.coeffs[i]
 	}
 	return out
@@ -179,6 +178,7 @@ func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
 	}
 
 	rp1.coeffs = stripTailingZeroes(sumCoeffs)
+	rp2.coeffs = stripTailingZeroes(rp2.coeffs)
 	return rp1
 }
 
@@ -215,6 +215,7 @@ func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
 		diffCoeffs[i] = rp1.coeffs[i] - rp2.coeffs[i]
 	}
 	rp1.coeffs = stripTailingZeroes(diffCoeffs)
+	rp2.coeffs = stripTailingZeroes(rp2.coeffs)
 	return rp1
 }
 
@@ -303,7 +304,7 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 		return -1
 	}
 
-	return rp.countRootsWithinFromSturmChain(a, b, rp.sturmChain())
+	return rp.countRootsWithinWithStrumChain(a, b, rp.sturmChain())
 
 }
 
@@ -317,7 +318,12 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 		panic("received nil *RealPolynomial")
 	}
 
-	nRootsWithin := rp.CountRootsWithin(a, b)
+	if a > b {
+		panic("invalid interval")
+	}
+
+	sturmChain := rp.sturmChain()
+	nRootsWithin := rp.countRootsWithinWithStrumChain(a, b, sturmChain)
 
 	if nRootsWithin == 0 {
 		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
@@ -327,52 +333,42 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 		return 0.0, nil
 	}
 
-	// Implement Newton's Method
-	var deriv *RealPolynomial
-	lower, upper := math.Min(a, b), math.Max(a, b)
-	guess := (lower + upper) / 2
-	for i := 0; i < globalNewtonIterations; i++ {
-		deriv = rp.Derivative()
-		guess -= rp.At(guess) / deriv.At(guess)
-	}
-
-	return guess, nil
+	return rp.findRootWithinWithStrumChain(a, b, sturmChain)
 }
 
 /*
-	Since a non changing Sturm Chain is used in some functions, the following private functions
-	with suffix "FromSturmChain" are used so that the overhead caused by recomputing the Sturm chain is ommited.
+	Since a non-changing Sturm Chain is used repetitevly through multiple functions, the following private functions
+	with suffix "WithStrumChain" are such that the overhead caused by recomputing the Sturm chain every use is avoided by making the chain an input.
 */
 
-func (rp *RealPolynomial) findRootWithinFromSturmChain(a, b float64, chain []*RealPolynomial) (float64, error) {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
-	nRootsWithin := rp.countRootsWithinFromSturmChain(a, b, chain)
+func (rp *RealPolynomial) findRootWithinWithStrumChain(a, b float64, chain []*RealPolynomial) (float64, error) {
+	nRootsWithin := rp.countRootsWithinWithStrumChain(a, b, chain)
 
 	if nRootsWithin == 0 {
 		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
 	}
 
-	if nRootsWithin < 0 { // Infinite amount of roots
+	if nRootsWithin == -1 { // Infinite amount of roots
 		return 0.0, nil
 	}
 
 	// Implement Newton's Method
-	var deriv *RealPolynomial
-	lower, upper := math.Min(a, b), math.Max(a, b)
-	guess := (lower + upper) / 2
-
+	deriv := rp.Derivative()
+	guess := (a + b) / 2
+	var derivAtGuess float64
 	for i := 0; i < globalNewtonIterations; i++ {
-		deriv = rp.Derivative()
-		guess -= rp.At(guess) / deriv.At(guess)
+		derivAtGuess = deriv.At(guess)
+		// In the case that the derivative evaluates to zero, return the current guess.
+		if derivAtGuess == 0.0 {
+			return guess, nil
+		}
+		guess -= rp.At(guess) / derivAtGuess
 	}
 
 	return guess, nil
 }
 
-func (rp *RealPolynomial) countRootsWithinFromSturmChain(a, b float64, chain []*RealPolynomial) int {
+func (rp *RealPolynomial) countRootsWithinWithStrumChain(a, b float64, chain []*RealPolynomial) int {
 	// Generate sequence A and B to count sign variations
 	var seqA, seqB []float64
 
@@ -405,7 +401,7 @@ func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 		if sturmChain[i].Degree() == 0 {
 			break
 		}
-		// The fact that EuclideanDiv changes the instance is kind of annoying here.
+
 		tmp = *sturmChain[i-1]
 		_, rem = tmp.EuclideanDiv(sturmChain[i])
 		sturmChain = append(sturmChain, rem.MulS(-1))
@@ -417,13 +413,16 @@ func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 /* End "SturmChain"-suffixed functions. */
 
 func (rp *RealPolynomial) FindRootsWithin(a, b float64) []float64 {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
 	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain())
 }
 
 func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
 	// Implement a hybrid Bisection Method through accumulative recursion
 
-	nRoots := rp.countRootsWithinFromSturmChain(a, b, chain)
+	nRoots := rp.countRootsWithinWithStrumChain(a, b, chain)
 	if nRoots > 1 {
 		mp := (a + b) / 2
 		return append(
@@ -432,11 +431,26 @@ func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chai
 		)
 
 	} else if nRoots == 1 {
-		root, _ := rp.findRootWithinFromSturmChain(a, b, chain)
+		fmt.Printf("Interval: [%f, %f]\n", a, b)
+		root, _ := rp.findRootWithinWithStrumChain(a, b, chain)
 		roots = append(roots, root)
+		fmt.Printf("Root: %f\n", root)
 	}
 
 	return roots
+}
+
+func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) [][2]float64 {
+	tmp := *rp
+
+	roots := (&tmp).Sub(rp2).FindRootsWithin(a, b)
+	points := make([][2]float64, len(roots))
+
+	for i, x := range roots {
+		points[i] = [2]float64{x, rp.At(x)}
+	}
+
+	return points
 }
 
 /*
