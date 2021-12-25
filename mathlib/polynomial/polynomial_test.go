@@ -3,11 +3,10 @@ package polynomial_test
 import (
 	"fmt"
 	"main/mathlib/polynomial"
-	"math"
 	"testing"
 )
 
-var Cons1, Cons2, Line1, Line2, Quad1, Quad2, Cube1 *polynomial.RealPolynomial
+var Cons1, Cons2, Line1, Line2, Quad1, Quad2, Cube1, Cube2 *polynomial.RealPolynomial
 
 func init() {
 	// Testing polynomials
@@ -18,7 +17,7 @@ func init() {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
-	Line1, err = polynomial.NewRealPolynomial([]float64{6, 5})
+	Line1, err = polynomial.NewRealPolynomial([]float64{0, 5})
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
@@ -43,6 +42,11 @@ func init() {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
+	Cube2, err = polynomial.NewRealPolynomial([]float64{1, -12, 1, 1})
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		return
+	}
 }
 
 func TestFindRootWithin(t *testing.T) {
@@ -55,9 +59,17 @@ func TestFindRootWithin(t *testing.T) {
 	fmt.Printf("Root: %f\n", root)
 }
 
+func TestFindRootsWithin(t *testing.T) {
+	var roots []float64
+	for i := 0; i < 10000; i++ {
+		roots = Cube2.FindRootsWithin(-5, 5)
+	}
+	Cube2.PrintExpr()
+	fmt.Printf("Roots: %v\n", roots)
+}
+
 func TestCountRoots(t *testing.T) {
 	nRoots := Quad2.CountRootsWithin(-5, 5)
-	math.Inf(1)
 	Quad2.PrintExpr()
 	fmt.Printf("Number of roots: %d\n", nRoots)
 }

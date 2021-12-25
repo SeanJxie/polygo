@@ -300,11 +300,34 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 		return -1
 	}
 
+	return rp.countRootsWithinFromSturmChain(a, b, rp.sturmChain())
+
+}
+
+func (rp *RealPolynomial) countRootsWithinFromSturmChain(a, b float64, chain []*RealPolynomial) int {
+	// Generate sequence A and B to count sign variations
+	var seqA, seqB []float64
+
+	for _, p := range chain {
+		seqA = append(seqA, p.At(a))
+		seqB = append(seqB, p.At(b))
+	}
+
+	halfOpenCount := countSignVariations(seqA) - countSignVariations(seqB)
+
+	if rp.At(a) == 0.0 { // Manually check open lower bound
+		return halfOpenCount + 1
+	} else {
+		return halfOpenCount
+	}
+}
+
+func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 	// Implement Sturm's Theorem
 
-	// Generate Sturm chain
 	var sturmChain []*RealPolynomial
-	var tmp, rem *RealPolynomial
+	var rem *RealPolynomial
+	var tmp RealPolynomial
 	sturmChain = append(sturmChain, rp)
 
 	deriv := rp.Derivative()
@@ -314,25 +337,13 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 		if sturmChain[i].Degree() == 0 {
 			break
 		}
-		tmp = sturmChain[i-1]
+		// The fact that EuclideanDiv changes the instance is kind of annoying here.
+		tmp = *sturmChain[i-1]
 		_, rem = tmp.EuclideanDiv(sturmChain[i])
 		sturmChain = append(sturmChain, rem.MulS(-1))
 	}
 
-	// Generate sequence A and B to count sign variations
-	var seqA, seqB []float64
-
-	for _, p := range sturmChain {
-		seqA = append(seqA, p.At(a))
-		seqB = append(seqB, p.At(b))
-	}
-
-	halfOpenCount := countSignVariations(seqA) - countSignVariations(seqB)
-	if rp.At(a) == 0.0 { // Manually check open lower bound
-		return halfOpenCount + 1
-	} else {
-		return halfOpenCount
-	}
+	return sturmChain
 }
 
 /*
@@ -368,46 +379,55 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 	return guess, nil
 }
 
-func (rp *RealPolynomial) FindRootsBestAttempt() {
-	// switch rp.Degree() {
+func (rp *RealPolynomial) findRootWithinFromSturmChain(a, b float64, chain []*RealPolynomial) (float64, error) {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
 
-	// 	case 0: // Case: constant
-	// 		{
-	// 			if rp.coeffs[0] == 0.0 {
-	// 				solutions = nil
-	// 				nSolutions = int(math.Inf(1))
-	// 			} else {
-	// 				solutions = []float64{}
-	// 				nSolutions = 0
-	// 			}
-	// 			break
-	// 		}
+	nRootsWithin := rp.countRootsWithinFromSturmChain(a, b, chain)
 
-	// 	case 1: // Case: linear
-	// 		{
-	// 			return []float64{-rp.coeffs[0] / rp.coeffs[1]}, 1
-	// 		}
+	if nRootsWithin == 0 {
+		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
+	}
 
-	// 	case 2: // Case: quadratic (quadratic formula)
-	// 		{
-	// 			a, b, c := rp.coeffs[2], rp.coeffs[1], rp.coeffs[0]
-	// 			disc := b*b - 4*a*c
-	// 			sqrtDisc := math.Sqrt(disc)
-	// 			if disc > 0 {
-	// 				solutions = []float64{(-b + sqrtDisc) / (2 * a), (-b - sqrtDisc) / (2 * a)}
-	// 				nSolutions = 2
-	// 			} else if disc < 0 {
-	// 				solutions = []float64{}
-	// 				nSolutions = 0
-	// 			} else {
-	// 				solutions = []float64{-b / (2 * a)}
-	// 				nSolutions = 1
-	// 			}
+	if nRootsWithin < 0 { // Infinite amount of roots
+		return 0.0, nil
+	}
 
-	// 		}
-	// 	}
+	// Implement Newton's Method
+	var deriv *RealPolynomial
+	lower, upper := math.Min(a, b), math.Max(a, b)
+	guess := (lower + upper) / 2
 
-	// 	return solutions, nSolutions
+	for i := 0; i < globalNewtonIterations; i++ {
+		deriv = rp.Derivative()
+		guess -= rp.At(guess) / deriv.At(guess)
+	}
+
+	return guess, nil
+}
+
+func (rp *RealPolynomial) FindRootsWithin(a, b float64) []float64 {
+	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain())
+}
+
+func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
+	// Implement a hybrid Bisection Method through accumulative recursion
+
+	nRoots := rp.countRootsWithinFromSturmChain(a, b, chain)
+	if nRoots > 1 {
+		mp := (a + b) / 2
+		return append(
+			rp.findRootsWithinAcc(a, mp, roots, chain),
+			rp.findRootsWithinAcc(mp, b, roots, chain)...,
+		)
+
+	} else if nRoots == 1 {
+		root, _ := rp.findRootWithinFromSturmChain(a, b, chain)
+		roots = append(roots, root)
+	}
+
+	return roots
 }
 
 /*
