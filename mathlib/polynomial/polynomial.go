@@ -304,6 +304,72 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 
 }
 
+/*
+Returns any float64 root of the current instance existing on the closed interval [a, b].
+
+Note: if there are no roots on the provided interval, an error is set.
+*/
+func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+
+	nRootsWithin := rp.CountRootsWithin(a, b)
+
+	if nRootsWithin == 0 {
+		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
+	}
+
+	if nRootsWithin < 0 { // Infinite amount of roots
+		return 0.0, nil
+	}
+
+	// Implement Newton's Method
+	var deriv *RealPolynomial
+	lower, upper := math.Min(a, b), math.Max(a, b)
+	guess := (lower + upper) / 2
+
+	for i := 0; i < globalNewtonIterations; i++ {
+		deriv = rp.Derivative()
+		guess -= rp.At(guess) / deriv.At(guess)
+	}
+
+	return guess, nil
+}
+
+/*
+	Since a non changing Sturm Chain is used in some functions, the following private functions
+	with suffix "FromSturmChain" are used so that the overhead caused by recomputing the Sturm chain is ommited.
+*/
+
+func (rp *RealPolynomial) findRootWithinFromSturmChain(a, b float64, chain []*RealPolynomial) (float64, error) {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+
+	nRootsWithin := rp.countRootsWithinFromSturmChain(a, b, chain)
+
+	if nRootsWithin == 0 {
+		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
+	}
+
+	if nRootsWithin < 0 { // Infinite amount of roots
+		return 0.0, nil
+	}
+
+	// Implement Newton's Method
+	var deriv *RealPolynomial
+	lower, upper := math.Min(a, b), math.Max(a, b)
+	guess := (lower + upper) / 2
+
+	for i := 0; i < globalNewtonIterations; i++ {
+		deriv = rp.Derivative()
+		guess -= rp.At(guess) / deriv.At(guess)
+	}
+
+	return guess, nil
+}
+
 func (rp *RealPolynomial) countRootsWithinFromSturmChain(a, b float64, chain []*RealPolynomial) int {
 	// Generate sequence A and B to count sign variations
 	var seqA, seqB []float64
@@ -346,66 +412,7 @@ func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 	return sturmChain
 }
 
-/*
-Returns any float64 root of the current instance existing on the closed interval [a, b].
-
-Note: if there are no roots on the provided interval, an error is set.
-*/
-func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
-	nRootsWithin := rp.CountRootsWithin(a, b)
-
-	if nRootsWithin == 0 {
-		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
-	}
-
-	if nRootsWithin < 0 { // Infinite amount of roots
-		return 0.0, nil
-	}
-
-	// Implement Newton's Method
-	var deriv *RealPolynomial
-	lower, upper := math.Min(a, b), math.Max(a, b)
-	guess := (lower + upper) / 2
-
-	for i := 0; i < globalNewtonIterations; i++ {
-		deriv = rp.Derivative()
-		guess -= rp.At(guess) / deriv.At(guess)
-	}
-
-	return guess, nil
-}
-
-func (rp *RealPolynomial) findRootWithinFromSturmChain(a, b float64, chain []*RealPolynomial) (float64, error) {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
-	nRootsWithin := rp.countRootsWithinFromSturmChain(a, b, chain)
-
-	if nRootsWithin == 0 {
-		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
-	}
-
-	if nRootsWithin < 0 { // Infinite amount of roots
-		return 0.0, nil
-	}
-
-	// Implement Newton's Method
-	var deriv *RealPolynomial
-	lower, upper := math.Min(a, b), math.Max(a, b)
-	guess := (lower + upper) / 2
-
-	for i := 0; i < globalNewtonIterations; i++ {
-		deriv = rp.Derivative()
-		guess -= rp.At(guess) / deriv.At(guess)
-	}
-
-	return guess, nil
-}
+/* End "SturmChain"-suffixed functions. */
 
 func (rp *RealPolynomial) FindRootsWithin(a, b float64) []float64 {
 	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain())
