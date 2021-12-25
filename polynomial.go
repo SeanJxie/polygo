@@ -304,7 +304,7 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 		return -1
 	}
 
-	return rp.countRootsWithinWithStrumChain(a, b, rp.sturmChain())
+	return rp.countRootsWithinWSC(a, b, rp.sturmChain())
 
 }
 
@@ -322,8 +322,13 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 		panic("invalid interval")
 	}
 
+	// Since findRootsWithinAcc operates on the half-open interval (a, b], manually check if a is a root.
+	if rp.At(a) == 0.0 {
+		return a, nil
+	}
+
 	sturmChain := rp.sturmChain()
-	nRootsWithin := rp.countRootsWithinWithStrumChain(a, b, sturmChain)
+	nRootsWithin := rp.countRootsWithinWSC(a, b, sturmChain)
 
 	if nRootsWithin == 0 {
 		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
@@ -333,16 +338,101 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 		return 0.0, nil
 	}
 
-	return rp.findRootWithinWithStrumChain(a, b, sturmChain)
+	return rp.findRootWithinWSC(a, b, sturmChain)
+}
+
+/*
+Returns all float64 roots of the current instance existing on the closed interval [a, b].
+
+Note: unlike FindRootWithin, no error is set if there are no solution on the provided interval. Instead, an empty slice is returned.
+*/
+func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+
+	// The only polynomial with infinitely many roots is P(x) = 0
+	// https://math.stackexchange.com/questions/1137190/is-there-a-polynomial-that-has-infinitely-many-roots
+	if rp.IsZero() {
+		return nil, errors.New("infinitely many solutions")
+	}
+
+	// Since findRootsWithinAcc operates on the half-open interval (a, b], manually check if a is a root.
+	if rp.At(a) == 0.0 {
+		return append(rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), a), nil
+	}
+	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), nil
+}
+
+// Accumulative implmentation of a hybrid Bisection Method through recursion.
+func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
+	nRoots := rp.countRootsWithinWSC(a, b, chain)
+	if nRoots > 1 {
+		mp := (a + b) / 2
+		return append(
+			rp.findRootsWithinAcc(a, mp, roots, chain),
+			rp.findRootsWithinAcc(mp, b, roots, chain)...,
+		)
+
+	} else if nRoots == 1 {
+		root, _ := rp.findRootWithinWSC(a, b, chain)
+		roots = append(roots, root)
+	}
+
+	return roots
+}
+
+/*
+Returns any intersection point (as a two-element slice [2]float64) of the current instance and the provided instance existing on the closed interval [a, b].
+
+Note: if there are no intersections on the provided interval, an error is set.
+*/
+func (rp *RealPolynomial) FindIntersectionWithin(a, b float64, rp2 *RealPolynomial) ([2]float64, error) {
+	tmp := *rp
+
+	root, err := (&tmp).Sub(rp2).FindRootWithin(a, b)
+	if err != nil {
+		return [2]float64{}, err
+	}
+
+	point := [2]float64{root, rp.At(root)}
+	return point, nil
+}
+
+/*
+Returns all float64 intersection points of the current instance existing on the closed interval [a, b].
+
+Note: unlike FindIntersectionWithin, no error is set if there are no intersections on the provided interval. Instead, an empty slice is returned.
+In the case that there are infinite solutions,
+*/
+func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) ([][2]float64, error) {
+	if rp == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
+	tmp := *rp
+
+	roots, err := (&tmp).Sub(rp2).FindRootsWithin(a, b)
+	if err != nil {
+		return nil, err
+	}
+
+	points := make([][2]float64, len(roots))
+
+	for i, x := range roots {
+		points[i] = [2]float64{x, rp.At(x)}
+	}
+
+	return points, nil
 }
 
 /*
 	Since a non-changing Sturm Chain is used repetitevly through multiple functions, the following private functions
-	with suffix "WithStrumChain" are such that the overhead caused by recomputing the Sturm chain every use is avoided by making the chain an input.
+	with suffix "WSC" are such that the overhead caused by recomputing the Sturm chain every use is avoided by making the chain an input.
 */
 
-func (rp *RealPolynomial) findRootWithinWithStrumChain(a, b float64, chain []*RealPolynomial) (float64, error) {
-	nRootsWithin := rp.countRootsWithinWithStrumChain(a, b, chain)
+func (rp *RealPolynomial) findRootWithinWSC(a, b float64, chain []*RealPolynomial) (float64, error) {
+	nRootsWithin := rp.countRootsWithinWSC(a, b, chain)
 
 	if nRootsWithin == 0 {
 		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
@@ -365,10 +455,15 @@ func (rp *RealPolynomial) findRootWithinWithStrumChain(a, b float64, chain []*Re
 		guess -= rp.At(guess) / derivAtGuess
 	}
 
+	// Operate on a half-open interval.
+	if guess == a {
+		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
+	}
+
 	return guess, nil
 }
 
-func (rp *RealPolynomial) countRootsWithinWithStrumChain(a, b float64, chain []*RealPolynomial) int {
+func (rp *RealPolynomial) countRootsWithinWSC(a, b float64, chain []*RealPolynomial) int {
 	// Generate sequence A and B to count sign variations
 	var seqA, seqB []float64
 
@@ -377,13 +472,7 @@ func (rp *RealPolynomial) countRootsWithinWithStrumChain(a, b float64, chain []*
 		seqB = append(seqB, p.At(b))
 	}
 
-	halfOpenCount := countSignVariations(seqA) - countSignVariations(seqB)
-
-	if rp.At(a) == 0.0 { // Manually check open lower bound
-		return halfOpenCount + 1
-	} else {
-		return halfOpenCount
-	}
+	return countSignVariations(seqA) - countSignVariations(seqB)
 }
 
 func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
@@ -410,48 +499,7 @@ func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 	return sturmChain
 }
 
-/* End "SturmChain"-suffixed functions. */
-
-func (rp *RealPolynomial) FindRootsWithin(a, b float64) []float64 {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain())
-}
-
-func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
-	// Implement a hybrid Bisection Method through accumulative recursion
-
-	nRoots := rp.countRootsWithinWithStrumChain(a, b, chain)
-	if nRoots > 1 {
-		mp := (a + b) / 2
-		return append(
-			rp.findRootsWithinAcc(a, mp, roots, chain),
-			rp.findRootsWithinAcc(mp, b, roots, chain)...,
-		)
-
-	} else if nRoots == 1 {
-		fmt.Printf("Interval: [%f, %f]\n", a, b)
-		root, _ := rp.findRootWithinWithStrumChain(a, b, chain)
-		roots = append(roots, root)
-		fmt.Printf("Root: %f\n", root)
-	}
-
-	return roots
-}
-
-func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) [][2]float64 {
-	tmp := *rp
-
-	roots := (&tmp).Sub(rp2).FindRootsWithin(a, b)
-	points := make([][2]float64, len(roots))
-
-	for i, x := range roots {
-		points[i] = [2]float64{x, rp.At(x)}
-	}
-
-	return points
-}
+/* End "WSC"-suffixed (and related) functions. */
 
 /*
 Returns a string representation of the current instance in increasing sum form.
