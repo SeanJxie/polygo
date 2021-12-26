@@ -6,6 +6,9 @@ A collection of basic tools that make working with polynomials easier in Go.
 go get -u github.com/SeanJxie/polygo
 ```
 
+## Documentation
+- godoc: https://pkg.go.dev/github.com/SeanJxie/polygo
+
 ## Examples
 
 Below, we create a simple quadratic and find its roots:
