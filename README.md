@@ -11,7 +11,7 @@ go get -u github.com/SeanJxie/polygo
 
 ## Examples
 
-Below, we create a simple quadratic and find its roots:
+Below, we create a simple quadratic and find its root:
 ```go
 package main
 
@@ -26,6 +26,6 @@ func main() {
 
 	root, _ := quad.FindRootWithin(-1, 1)
 
-	fmt.Printf("Root: %f\n", root)
+	fmt.Printf("Root: %f\n", root) // Root: 0.000000
 }
 ```
