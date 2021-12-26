@@ -1,3 +1,23 @@
 # PolyGo
 A collection of tools that make working with polynomials easier in Go.
 
+## Examples
+
+Below, we create a quadratic and find its roots:
+```
+package main
+
+import (
+	"fmt"
+	"github.com/SeanJxie/polygo"
+)
+
+func main() {
+	quadCoefficients := []float64{0, 0, 2} // x^2
+	quad, _ := polygo.NewRealPolynomial(quadCoefficients)
+
+	root, _ := quad.FindRootWithin(-1, 1)
+
+	fmt.Printf("Root: %f\n", root) // Root: 0.000000
+}
+```
