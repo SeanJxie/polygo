@@ -3,7 +3,7 @@ A collection of tools that make working with polynomials easier in Go.
 
 ## Examples
 
-Below, we create a quadratic and find its roots:
+Below, we create a simple quadratic and find its roots:
 ```go
 package main
 
