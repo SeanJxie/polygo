@@ -1,4 +1,4 @@
-package polynomial
+package polygo
 
 import (
 	"errors"
