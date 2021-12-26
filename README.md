@@ -9,7 +9,6 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/SeanJxie/polygo"
 )
 
