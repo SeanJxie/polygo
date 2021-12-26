@@ -1,5 +1,5 @@
 # PolyGo
-A collection of tools that make working with polynomials easier in Go.
+A collection of basic tools that make working with polynomials easier in Go.
 
 ## Examples
 
