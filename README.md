@@ -9,6 +9,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/SeanJxie/polygo"
 )
 
@@ -18,6 +19,6 @@ func main() {
 
 	root, _ := quad.FindRootWithin(-1, 1)
 
-	fmt.Printf("Root: %f\n", root) // Root: 0.000000
+	fmt.Printf("Root: %f\n", root)
 }
 ```
