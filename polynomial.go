@@ -1,30 +1,28 @@
+// Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
 
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/cmplx"
 )
 
-/*
-A real RealPolynomial is represented as a slice of coefficients ordered increasingly by degree.
-
-For example:
-5 x^0 + 4 x^1 + (-2) x^2 + ...
-*/
+// A real RealPolynomial is represented as a slice of coefficients ordered increasingly by degree.
+// For example, one can imagine: 5x^0 + 4x^1 + (-2)x^2 + ...
 type RealPolynomial struct {
 	coeffs []float64
 }
 
 /* --- BEGIN GLOBAL SETTINGS --- */
+// The
 var globalNewtonIterations = 100
 
 /* --- END GLOBAL SETTINGS --- */
 
 /* --- BEGIN STRUCT METHODS --- */
 
-/*
-Returns the number of coefficients of the current instance.
-*/
+// NumCoeffs returns the number of coefficients of the current instance.
 func (rp *RealPolynomial) NumCoeffs() int {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -32,9 +30,7 @@ func (rp *RealPolynomial) NumCoeffs() int {
 	return len(rp.coeffs)
 }
 
-/*
-Returns the int degree of the current instance.
-*/
+// Degree returns the degree of the current instance.
 func (rp *RealPolynomial) Degree() int {
 	if rp == nil {
 		panic("received nil RealPolynomial")
@@ -44,9 +40,7 @@ func (rp *RealPolynomial) Degree() int {
 	return len(rp.coeffs) - 1
 }
 
-/*
-Returns the float64 value of the current instance evaluated at x.
-*/
+// At returns the value of the current instance evaluated at x.
 func (rp *RealPolynomial) At(x float64) float64 {
 
 	// Implement Horner's Method
@@ -61,9 +55,8 @@ func (rp *RealPolynomial) At(x float64) float64 {
 	return out
 }
 
-/*
-Returns the derivative of the current instance.
-*/
+// Derivative returns the derivative of the current instance.
+// The current instance is not modified.
 func (rp *RealPolynomial) Derivative() *RealPolynomial {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -85,9 +78,7 @@ func (rp *RealPolynomial) Derivative() *RealPolynomial {
 	return deriv
 }
 
-/*
-Returns the float64 coefficient of the highest degree term of the current instance.
-*/
+// LeadCoeff Returns the coefficient of the highest degree term of the current instance.
 func (rp *RealPolynomial) LeadCoeff() float64 {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -95,9 +86,9 @@ func (rp *RealPolynomial) LeadCoeff() float64 {
 	return rp.coeffs[len(rp.coeffs)-1]
 }
 
-/*
-Returns a RealPolynomial which has been multiplied by x^offset.
-*/
+// ShiftRight shifts the coefficients of each term in the current instance rightwards by offset and returns the resulting polynomial.
+// The current instance is not modified.
+// A right shift by N is equivalent to multipliying the current instance by x^N.
 func (rp *RealPolynomial) ShiftRight(offset int) *RealPolynomial {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -106,16 +97,12 @@ func (rp *RealPolynomial) ShiftRight(offset int) *RealPolynomial {
 		panic("invalid offset")
 	}
 	shiftedCoeffs := make([]float64, rp.NumCoeffs()+offset)
-	for i, c := range rp.coeffs {
-		shiftedCoeffs[i+offset] = c
-	}
+	copy(shiftedCoeffs[offset:], rp.coeffs)
 	rp, _ = NewRealPolynomial(shiftedCoeffs) // safe call
 	return rp
 }
 
-/*
-Checks if the current instance is equal to the RealPolynomial input and returns true if so. Otherwise, false is returned.
-*/
+// Equal returns true if the current instance is equal to rp2. Otherwise, false is returned.
 func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
 	if rp1 == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
@@ -134,9 +121,7 @@ func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
 	return true
 }
 
-/*
-Checks if the current instance is equal to the zero RealPolynomial (only one coefficient of 0). Otherwise, false is returned.
-*/
+// IsZero returns true if current instance is equal to the zero polynomial. Otherwise, false is returned.
 func (rp *RealPolynomial) IsZero() bool {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -144,9 +129,8 @@ func (rp *RealPolynomial) IsZero() bool {
 	return rp.Degree() == 0 && rp.coeffs[0] == 0.0
 }
 
-/*
-Adds the current instance and the RealPolynomial input and returns the sum. The current instance is also set to the sum.
-*/
+// Add adds the current instance and rp2 and returns the sum.
+// The current instance is also set to the sum.
 func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
 	if rp1 == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
@@ -182,9 +166,8 @@ func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-/*
-Subtracts the current instance and the RealPolynomial input and returns the difference. The current instance is also set to the difference.
-*/
+// Sub subtracts rp2 from the current instance and returns the difference.
+// The current instance is also set to the difference.
 func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
 	if rp1 == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
@@ -219,10 +202,11 @@ func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-/*
-Multiplies the current instance and the RealPolynomial input and returns the product. The current instance is also set to the product.
-*/
-func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
+// MulNaive multiplies the current instance with rp2 and returns the product.
+// The current instance is also set to the product.
+//
+// It is not recommended to use this function. Use Mul instead.
+func (rp1 *RealPolynomial) MulNaive(rp2 *RealPolynomial) *RealPolynomial {
 	if rp1 == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
 	}
@@ -240,9 +224,49 @@ func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-/*
-Multiplies the current instance and the float64 input and returns the product. The current instance is also set to the product.
-*/
+// Mul multiplies the current instance with rp2 and returns the product.
+// The current instance is also set to the product.
+func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
+	if rp1 == nil || rp2 == nil {
+		panic("received nil *RealPolynomial")
+	}
+
+	lenRp1 := len(rp1.coeffs)
+	lenRp2 := len(rp2.coeffs)
+
+	var padLen int
+
+	if lenRp1 > lenRp2 {
+		padLen = nextClosestPowerOfTwo(lenRp1)
+	} else {
+		padLen = nextClosestPowerOfTwo(lenRp2)
+	}
+
+	coeffs1 := make([]float64, padLen)
+	coeffs2 := make([]float64, padLen)
+	copy(coeffs1, rp1.coeffs)
+	copy(coeffs2, rp2.coeffs)
+
+	// With the FFT, we can run in O(n log n) time.
+	fa := fastFourierTransform(complex128Slice(coeffs1))
+	fb := fastFourierTransform(complex128Slice(coeffs2))
+
+	fc := make([]complex128, padLen)
+	for i := 0; i < padLen; i++ {
+		fc[i] = fa[i] * fb[i]
+	}
+
+	tmpCoeffs := float64Slice(inverseFastFourierTransform(fc))
+	for i, c := range tmpCoeffs {
+		tmpCoeffs[i] = c / float64(padLen)
+	}
+
+	rp1.coeffs = stripTailingZeroes(tmpCoeffs)
+	return rp1
+}
+
+// MulS multiplies the current instance with the scalar s and returns the product.
+// The current instance is also set to the product.
 func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
 	for i := 0; i < len(rp.coeffs); i++ {
 		rp.coeffs[i] *= s
@@ -250,9 +274,8 @@ func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
 	return rp
 }
 
-/*
-Divides the current instance by the RealPolynomial input and returns the result as a quotient, remainder pair. The current instance is also set to the quotient.
-*/
+// EuclideanDiv divides the current instance by rp2 and returns the result as a quotient-remainder pair.
+// The current instance is also set to the quotient.
 func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *RealPolynomial) {
 	if rp1 == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
@@ -286,11 +309,8 @@ func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *
 	return rp1, &rem
 }
 
-/*
-Returns the int number of roots of the current instance on the closed interval [a, b].
-
-Note: if there are an infinite amount of roots, -1 is returned.
-*/
+// CountRootsWithin returns the number of roots of the current instance on the closed interval [a, b].
+// If there are an infinite amount of roots, -1 is returned.
 func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -308,11 +328,8 @@ func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
 
 }
 
-/*
-Returns any float64 root of the current instance existing on the closed interval [a, b].
-
-Note: if there are no roots on the provided interval, an error is set.
-*/
+// FindRootWithin returns ANY root of the current instance existing on the closed interval [a, b].
+// If there are no roots on the provided interval, an error is set.
 func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -341,11 +358,9 @@ func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
 	return rp.findRootWithinWSC(a, b, sturmChain)
 }
 
-/*
-Returns all float64 roots of the current instance existing on the closed interval [a, b].
-
-Note: unlike FindRootWithin, no error is set if there are no solution on the provided interval. Instead, an empty slice is returned.
-*/
+// FindRootsWithin returns ALL roots of the current instance existing on the closed interval [a, b].
+// Unlike FindRootWithin, no error is set if there are no solutions on the provided interval. Instead, an empty slice is returned.
+// If there are an infinite number of solutions on [a, b], an error is set.
 func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -364,7 +379,8 @@ func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
 	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), nil
 }
 
-// Accumulative implmentation of a hybrid Bisection Method through recursion.
+// findRootsWithinAcc is an accumulative implmentation of a hybrid Bisection Method through recursion.
+// Wrapped by FindRootsWithin.
 func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
 	nRoots := rp.countRootsWithinWSC(a, b, chain)
 	if nRoots > 1 {
@@ -382,11 +398,8 @@ func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chai
 	return roots
 }
 
-/*
-Returns any intersection point (as a two-element slice [2]float64) of the current instance and the provided instance existing on the closed interval [a, b].
-
-Note: if there are no intersections on the provided interval, an error is set.
-*/
+// FindIntersectionWithin returns ANY intersection point (as a two-element slice) of the current instance and rp2 existing on the closed interval [a, b].
+// If there are no intersections on the provided interval, an error is set.
 func (rp *RealPolynomial) FindIntersectionWithin(a, b float64, rp2 *RealPolynomial) ([2]float64, error) {
 	tmp := *rp
 
@@ -399,20 +412,16 @@ func (rp *RealPolynomial) FindIntersectionWithin(a, b float64, rp2 *RealPolynomi
 	return point, nil
 }
 
-/*
-Returns all float64 intersection points of the current instance existing on the closed interval [a, b].
-
-Note: unlike FindIntersectionWithin, no error is set if there are no intersections on the provided interval. Instead, an empty slice is returned.
-In the case that there are infinite solutions,
-*/
+// FindIntersectionsWithin returns ALL intersection point (as a two-element slice) of the current instance and rp2 existing on the closed interval [a, b].
+// Unlike FindIntersectionWithin, no error is set if there are no intersections on the provided interval. Instead, an empty slice is returned.
+// If there are an infinite number or solutions, an error is set.
 func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) ([][2]float64, error) {
 	if rp == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
 	}
 
 	tmp := *rp
-
-	roots, err := (&tmp).Sub(rp2).FindRootsWithin(a, b)
+	roots, err := tmp.Sub(rp2).FindRootsWithin(a, b)
 	if err != nil {
 		return nil, err
 	}
@@ -427,8 +436,10 @@ func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynom
 }
 
 /*
-	Since a non-changing Sturm Chain is used repetitevly through multiple functions, the following private functions
-	with suffix "WSC" are such that the overhead caused by recomputing the Sturm chain every use is avoided by making the chain an input.
+
+Since a non-changing Sturm Chain is used repetitevly through multiple functions, the following private functions
+with suffix "WSC" are such that the overhead caused by recomputing the Sturm chain every use is avoided by making the chain an input.
+
 */
 
 func (rp *RealPolynomial) findRootWithinWSC(a, b float64, chain []*RealPolynomial) (float64, error) {
@@ -499,11 +510,13 @@ func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 	return sturmChain
 }
 
-/* End "WSC"-suffixed (and related) functions. */
-
 /*
-Returns a string representation of the current instance in increasing sum form.
+
+End "WSC"-suffixed (and related) functions.
+
 */
+
+// Expr returns a string representation of the current instance in increasing sum form.
 func (rp *RealPolynomial) Expr() string {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -521,9 +534,7 @@ func (rp *RealPolynomial) Expr() string {
 	return expr + "\n"
 }
 
-/*
-Prints the string expression of the polynomial in increasing sum form to standard output.
-*/
+// PrintExpr prints the string expression of the current instance in increasing sum form to standard output.
 func (rp *RealPolynomial) PrintExpr() {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
@@ -542,6 +553,24 @@ func stripTailingZeroes(s []float64) []float64 {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+// Cast []float64 to []complex128
+func complex128Slice(s []float64) []complex128 {
+	ret := make([]complex128, len(s))
+	for i, e := range s {
+		ret[i] = complex(e, 0)
+	}
+	return ret
+}
+
+// Cast []complex128 to []float64
+func float64Slice(s []complex128) []float64 {
+	ret := make([]float64, len(s))
+	for i, e := range s {
+		ret[i] = real(e)
+	}
+	return ret
 }
 
 // Counts sign variations in s: https://en.wikipedia.org/wiki/Budan%27s_theorem#Sign_variation
@@ -565,9 +594,84 @@ func countSignVariations(s []float64) int {
 	return count
 }
 
-/*
-Initializes and returns a new RealPolynomial struct with the given coefficients.
-*/
+// Implements FFT
+func fastFourierTransform(a []complex128) []complex128 {
+	n := len(a)
+
+	if n == 1 {
+		return a
+	}
+
+	halfn := n / 2
+
+	ae := make([]complex128, halfn)
+	ao := make([]complex128, halfn)
+
+	for i := 0; i < halfn; i++ {
+		ae[i], ao[i] = a[i*2], a[i*2+1]
+	}
+
+	ye := fastFourierTransform(ae)
+	yo := fastFourierTransform(ao)
+
+	wn := cmplx.Exp(complex((2.0*math.Pi)/float64(n), 0.0) * 1.0i)
+	w := complex(1.0, 0.0)
+
+	y := make([]complex128, n)
+	for k := 0; k < halfn; k++ {
+		y[k] = ye[k] + w*yo[k]
+		y[k+halfn] = ye[k] - w*yo[k]
+		w *= wn
+	}
+
+	return y
+}
+
+// Implements IFFT
+func inverseFastFourierTransform(a []complex128) []complex128 {
+	n := len(a)
+
+	if n == 1 {
+		return a
+	}
+
+	halfn := n / 2
+
+	ae := make([]complex128, halfn)
+	ao := make([]complex128, halfn)
+
+	for i := 0; i < halfn; i++ {
+		ae[i], ao[i] = a[i*2], a[i*2+1]
+	}
+
+	ye := inverseFastFourierTransform(ae)
+	yo := inverseFastFourierTransform(ao)
+
+	wnInv := cmplx.Exp(complex((-2.0*math.Pi)/float64(n), 0.0) * 1.0i)
+	w := 1.0 + 0.0i
+
+	y := make([]complex128, n)
+	for k := 0; k < halfn; k++ {
+		y[k] = ye[k] + w*yo[k]
+		y[k+halfn] = ye[k] - w*yo[k]
+		w *= wnInv
+	}
+
+	return y
+}
+
+// Finds the smallest power of 2 greater than n.
+func nextClosestPowerOfTwo(n int) int {
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	n++
+	return n
+}
+
+// NewRealPolynomial returns a new *RealPolynomial instance with the given coeffs.
 func NewRealPolynomial(coeffs []float64) (*RealPolynomial, error) {
 	if len(coeffs) == 0 {
 		return nil, errors.New("cannot create polynomial with no coefficients")
@@ -579,9 +683,7 @@ func NewRealPolynomial(coeffs []float64) (*RealPolynomial, error) {
 	return &newPolynomial, nil
 }
 
-/*
-Set the number of iterations that Newton's Method will use in root finding functions.
-*/
+// SetNewtonIterations sets the number of iterations used in Newton's Method implmentation in root solving functions.
 func SetNewtonIterations(n int) error {
 	if n < 0 {
 		return errors.New("cannot set negative iterations for Newton's Method")
