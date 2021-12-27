@@ -15,7 +15,7 @@ You can find the full list of functions through godoc: https://pkg.go.dev/github
 
 ## Examples
 
-- Create a simple quadratic and find the root:
+- Create a simple quadratic and solve it:
 ```go
 package main
 
