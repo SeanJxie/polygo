@@ -11,7 +11,7 @@ go get -u github.com/SeanJxie/polygo
 ```
 
 ## Documentation
-You can find the full list of functions through godoc: https://pkg.go.dev/github.com/SeanJxie/polygo
+You can find the full list of functions through godoc: https://pkg.go.dev/github.com/seanjxie/polygo
 
 ## Examples
 
