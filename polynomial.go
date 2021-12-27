@@ -15,7 +15,7 @@ type RealPolynomial struct {
 }
 
 /* --- BEGIN GLOBAL SETTINGS --- */
-// The
+// The number of iterations used in Newton's Method implmentation in root solving functions.
 var globalNewtonIterations = 100
 
 /* --- END GLOBAL SETTINGS --- */
