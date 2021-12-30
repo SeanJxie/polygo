@@ -1,9 +1,13 @@
-# PolyGo
+# polygo
 A collection of tools that make working with polynomials easier in Go.
 
 ## What's New
 - Fast polynomial multiplication through the Fast Fourier Transform.
 - Better documentation.
+
+## What's to Come
+- A graphing tool
+- More polynomial tools (integration, critial point finding, binomial expansion, etc.)
 
 ## Installation
 ```
