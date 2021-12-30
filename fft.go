@@ -1,7 +1,7 @@
 package polygo
 
 /*
-An implmentation of the Fast Fourier Transform.
+This file contains an implmentation of the Fast Fourier Transform.
 */
 
 import (
