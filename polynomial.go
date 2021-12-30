@@ -345,7 +345,7 @@ func (rp *RealPolynomial) Expr() string {
 		}
 	}
 
-	return expr + "\n"
+	return expr
 }
 
 // PrintExpr prints the string expression of the current instance in increasing sum form to standard output.
