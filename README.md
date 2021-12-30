@@ -5,6 +5,10 @@ A collection of tools that make working with polynomials easier in Go.
 - Fast polynomial multiplication through the Fast Fourier Transform.
 - Better documentation.
 
+## What's to Come
+- A graphing tool
+- More polynomial tools (integration, critial point finding, binomial expansion, etc.)
+
 ## Installation
 ```
 go get -u github.com/SeanJxie/polygo
