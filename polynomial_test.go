@@ -11,6 +11,11 @@ func TestQuadCoefficients(t *testing.T) {
 	root, _ := quad.FindRootWithin(-1, 1)
 
 	quadraticExpression := quad.Expr()
+	/*
+		Due to https://github.com/SeanJxie/polygo/issues/1 I had
+		to add [:len(quadraticExpression)-1] ( removing last chars from the
+		Expr results
+	*/
 	if quadraticExpression[:len(quadraticExpression)-1] != "0.000000x^0 + 0.000000x^1 + 2.000000x^2" {
 		t.Fatalf("error in calculation -'%v'", quadraticExpression[:len(quadraticExpression)-1])
 	}
