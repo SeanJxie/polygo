@@ -1,5 +1,9 @@
 package polygo
 
+/*
+An implmentation of the Fast Fourier Transform.
+*/
+
 import (
 	"math"
 	"math/cmplx"

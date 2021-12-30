@@ -1,6 +1,9 @@
+// Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
 
-// --- BEGIN UTILITY FUNCTIONS ---
+/*
+This file contains general utility functions used throughout the library.
+*/
 
 // Strip all leading zeroes in the slice s. If the entire slice is filled with 0, the first element will be kept.
 func stripTailingZeroes(s []float64) []float64 {
@@ -23,30 +26,9 @@ func complex128Slice(s []float64) []complex128 {
 func float64Slice(s []complex128) []float64 {
 	ret := make([]float64, len(s))
 	for i, e := range s {
-		ret[i] = real(e)
+		ret[i] = float64(real(e))
 	}
 	return ret
-}
-
-// Counts sign variations in s: https://en.wikipedia.org/wiki/Budan%27s_theorem#Sign_variation
-func countSignVariations(s []float64) int {
-	// Filter zeroes in s.
-	var filtered []float64
-	for i := 0; i < len(s); i++ {
-		if s[i] != 0.0 {
-			filtered = append(filtered, s[i])
-		}
-	}
-
-	// Count sign changes.
-	var count int
-	for i := 0; i < len(filtered)-1; i++ {
-		if filtered[i]*filtered[i+1] < 0 {
-			count++
-		}
-	}
-
-	return count
 }
 
 // Finds the smallest power of 2 greater than n.

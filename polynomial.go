@@ -1,6 +1,10 @@
 // Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
 
+/*
+This file contains polynomial type defintions and general operations.
+*/
+
 import (
 	"errors"
 	"fmt"
@@ -12,9 +16,14 @@ type RealPolynomial struct {
 	coeffs []float64
 }
 
+// A point in R^2.
+type Point struct {
+	X, Y float64
+}
+
 /* --- BEGIN GLOBAL SETTINGS --- */
 // The number of iterations used in Newton's Method implmentation in root solving functions.
-var globalNewtonIterations = 100
+var globalNewtonIterations = 25
 
 /* --- END GLOBAL SETTINGS --- */
 
@@ -128,6 +137,24 @@ func (rp *RealPolynomial) IsZero() bool {
 	return rp.Degree() == 0 && rp.coeffs[0] == 0.0
 }
 
+// IsDegree returns true if current instance is of degree n. Otherwise, false is returned.
+func (rp *RealPolynomial) IsDegree(n int) bool {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+	return rp.Degree() == n
+}
+
+// CoeffAtDegree returns the coefficient at degree n.
+//
+// n should be positive.
+func (rp *RealPolynomial) CoeffAtDegree(n int) float64 {
+	if rp == nil {
+		panic("received nil *RealPolynomial")
+	}
+	return rp.coeffs[n]
+}
+
 // Add adds the current instance and rp2 and returns the sum.
 // The current instance is also set to the sum.
 func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
@@ -219,7 +246,7 @@ func (rp1 *RealPolynomial) MulNaive(rp2 *RealPolynomial) *RealPolynomial {
 		}
 	}
 
-	rp1.coeffs = prodCoeffs
+	rp1.coeffs = stripTailingZeroes(prodCoeffs)
 	return rp1
 }
 
@@ -233,13 +260,7 @@ func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
 	lenRp1 := len(rp1.coeffs)
 	lenRp2 := len(rp2.coeffs)
 
-	var padLen int
-
-	if lenRp1 > lenRp2 {
-		padLen = nextClosestPowerOfTwo(lenRp1)
-	} else {
-		padLen = nextClosestPowerOfTwo(lenRp2)
-	}
+	padLen := nextClosestPowerOfTwo(lenRp1 + lenRp2 - 1)
 
 	coeffs1 := make([]float64, padLen)
 	coeffs2 := make([]float64, padLen)
@@ -256,11 +277,12 @@ func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
 	}
 
 	tmpCoeffs := float64Slice(inverseFastFourierTransform(fc))
+
 	for i, c := range tmpCoeffs {
 		tmpCoeffs[i] = c / float64(padLen)
 	}
 
-	rp1.coeffs = stripTailingZeroes(tmpCoeffs)
+	rp1.coeffs = stripTailingZeroes(tmpCoeffs[:rp1.Degree()+rp2.Degree()+1])
 	return rp1
 }
 

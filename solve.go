@@ -1,4 +1,9 @@
+// Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
+
+/*
+This file contains polynomial solvers and related algorithms.
+*/
 
 import "errors"
 
@@ -91,24 +96,24 @@ func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chai
 	return roots
 }
 
-// FindIntersectionWithin returns ANY intersection point (as a two-element slice) of the current instance and rp2 existing on the closed interval [a, b].
+// FindIntersectionWithin returns ANY intersection point of the current instance and rp2 existing on the closed interval [a, b].
 // If there are no intersections on the provided interval, an error is set.
-func (rp *RealPolynomial) FindIntersectionWithin(a, b float64, rp2 *RealPolynomial) ([2]float64, error) {
+func (rp *RealPolynomial) FindIntersectionWithin(a, b float64, rp2 *RealPolynomial) (Point, error) {
 	tmp := *rp
 
 	root, err := (&tmp).Sub(rp2).FindRootWithin(a, b)
 	if err != nil {
-		return [2]float64{}, err
+		return Point{}, err
 	}
 
-	point := [2]float64{root, rp.At(root)}
+	point := Point{root, rp.At(root)}
 	return point, nil
 }
 
-// FindIntersectionsWithin returns ALL intersection point (as a two-element slice) of the current instance and rp2 existing on the closed interval [a, b].
+// FindIntersectionsWithin returns ALL intersection point of the current instance and rp2 existing on the closed interval [a, b].
 // Unlike FindIntersectionWithin, no error is set if there are no intersections on the provided interval. Instead, an empty slice is returned.
 // If there are an infinite number or solutions, an error is set.
-func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) ([][2]float64, error) {
+func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) ([]Point, error) {
 	if rp == nil || rp2 == nil {
 		panic("received nil *RealPolynomial")
 	}
@@ -119,10 +124,10 @@ func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynom
 		return nil, err
 	}
 
-	points := make([][2]float64, len(roots))
+	points := make([]Point, len(roots))
 
 	for i, x := range roots {
-		points[i] = [2]float64{x, rp.At(x)}
+		points[i] = Point{x, rp.At(x)}
 	}
 
 	return points, nil
@@ -201,6 +206,27 @@ func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
 	}
 
 	return sturmChain
+}
+
+// Counts sign variations in s: https://en.wikipedia.org/wiki/Budan%27s_theorem#Sign_variation
+func countSignVariations(s []float64) int {
+	// Filter zeroes in s.
+	var filtered []float64
+	for i := 0; i < len(s); i++ {
+		if s[i] != 0.0 {
+			filtered = append(filtered, s[i])
+		}
+	}
+
+	// Count sign changes.
+	var count int
+	for i := 0; i < len(filtered)-1; i++ {
+		if filtered[i]*filtered[i+1] < 0 {
+			count++
+		}
+	}
+
+	return count
 }
 
 /*
