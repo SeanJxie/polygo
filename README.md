@@ -1,5 +1,5 @@
 # polygo
-A collection of tools that make working with polynomials easier in Go.
+`polygo` is a fast, light-weight library of tools that make working with polynomials easy in Go.
 
 ## What's New
 - A graphing tool
