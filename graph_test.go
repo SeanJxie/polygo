@@ -1,18 +1,17 @@
-package polygo_test
+package polygo
 
 import (
 	"fmt"
-	"main/polygo"
 	"testing"
 )
 
 func TestGraph(t *testing.T) {
-	p1, _ := polygo.NewRealPolynomial([]float64{0, -2, 0, 1})
-	p2, _ := polygo.NewRealPolynomial([]float64{-5, -2, 5, 1})
+	p1, _ := NewRealPolynomial([]float64{0, -2, 0, 1})
+	p2, _ := NewRealPolynomial([]float64{-5, -2, 5, 1})
 	fmt.Println(p1)
 	fmt.Println(p2)
 
-	graphOptions := polygo.GraphOptions{
+	graphOptions := GraphOptions{
 		ShowIntersections:      true,
 		ShowAxis:               true,
 		ShowAxisLabels:         true,
@@ -23,12 +22,12 @@ func TestGraph(t *testing.T) {
 		ShowGrid:               true,
 	}
 
-	graph, err := polygo.NewGraph([]*polygo.RealPolynomial{p2, p1}, polygo.Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
+	graph, err := NewGraph([]*RealPolynomial{p2, p1}, Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 
-	err = graph.SaveAsPNG("test2.png")
+	err = graph.SaveAsPNG("test.png")
 	if err != nil {
 		t.Fatalf("error: %v\n", err)
 	}
