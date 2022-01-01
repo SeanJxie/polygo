@@ -2,11 +2,9 @@
 A collection of tools that make working with polynomials easier in Go.
 
 ## What's New
-- Fast polynomial multiplication through the Fast Fourier Transform.
-- Better documentation.
+- A graphing tool
 
 ## What's to Come
-- A graphing tool
 - More polynomial tools (integration, critial point finding, binomial expansion, etc.)
 
 ## Installation
@@ -18,6 +16,36 @@ go get -u github.com/SeanJxie/polygo
 You can find the full list of functions through godoc: https://pkg.go.dev/github.com/seanjxie/polygo
 
 ## Examples
+- Graph functions:
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/SeanJxie/polygo"
+)
+
+func main() {
+	p1, _ := polygo.NewRealPolynomial([]float64{0, -2, 0, 1})
+	p2, _ := polygo.NewRealPolynomial([]float64{-5, -2, 5, 1})
+
+	graphOptions := GraphOptions{
+		ShowIntersections:      true,
+		ShowAxis:               true,
+		ShowAxisLabels:         true,
+		ShowIntersectionLabels: true,
+		ShowRootLabels:         true,
+		ShowRoots:              true,
+		ShowYintercepts:        true,
+		ShowGrid:               true,
+	}
+
+	graph, _ := NewGraph([]*RealPolynomial{p2, p1}, Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
+	graph.SaveAsPNG("graph1.png")
+}
+```
+Output:
+![graph1.png](https://github.com/SeanJxie/polygo/blob/main/graph_samples/graph1.png)
 
 - Create a simple quadratic and find the root:
 ```go
