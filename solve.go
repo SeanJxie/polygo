@@ -1,4 +1,3 @@
-// Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
 
 /*

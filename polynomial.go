@@ -1,4 +1,3 @@
-// Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
 
 /*
@@ -10,7 +9,7 @@ import (
 	"fmt"
 )
 
-// A real RealPolynomial is represented as a slice of coefficients ordered increasingly by degree.
+// A RealPolynomial is represented as a slice of coefficients ordered increasingly by degree.
 // For example, one can imagine: 5x^0 + 4x^1 + (-2)x^2 + ...
 type RealPolynomial struct {
 	coeffs []float64
@@ -331,7 +330,7 @@ func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *
 }
 
 // Expr returns a string representation of the current instance in increasing sum form.
-func (rp *RealPolynomial) Expr() string {
+func (rp *RealPolynomial) String() string {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
 	}
@@ -348,13 +347,17 @@ func (rp *RealPolynomial) Expr() string {
 	return expr
 }
 
+func (p Point) String() string {
+	return fmt.Sprintf("(%f, %f)", p.X, p.Y)
+}
+
 // PrintExpr prints the string expression of the current instance in increasing sum form to standard output.
-func (rp *RealPolynomial) PrintExpr() {
+func (rp *RealPolynomial) Print() {
 	if rp == nil {
 		panic("received nil *RealPolynomial")
 	}
 
-	fmt.Print(rp.Expr())
+	fmt.Println(rp)
 }
 
 // --- END STRUCT METHODS ---

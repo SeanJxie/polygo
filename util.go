@@ -1,9 +1,14 @@
-// Package polygo is a collection of tools that make working with polynomials easier in Go.
 package polygo
+
+import "math"
 
 /*
 This file contains general utility functions used throughout the library.
 */
+
+func RoundToNearestUnit(x, unit float64) float64 {
+	return math.Round(x/unit) * unit
+}
 
 // Strip all leading zeroes in the slice s. If the entire slice is filled with 0, the first element will be kept.
 func stripTailingZeroes(s []float64) []float64 {
