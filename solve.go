@@ -4,7 +4,9 @@ package polygo
 This file contains polynomial solvers and related algorithms.
 */
 
-import "errors"
+import (
+	"errors"
+)
 
 // CountRootsWithin returns the number of roots of the current instance on the closed interval [a, b].
 // If there are an infinite amount of roots, -1 is returned.
@@ -73,7 +75,7 @@ func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
 	if rp.At(a) == 0.0 {
 		return append(rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), a), nil
 	}
-	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), nil
+	return removeDuplicateFloat(rp.findRootsWithinAcc(a, b, nil, rp.sturmChain())), nil
 }
 
 // findRootsWithinAcc is an accumulative implmentation of a hybrid Bisection Method through recursion.
@@ -123,6 +125,7 @@ func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynom
 		return nil, err
 	}
 
+	roots = removeDuplicateFloat(roots)
 	points := make([]Point, len(roots))
 
 	for i, x := range roots {
