@@ -85,8 +85,8 @@ var colMagenta = color.RGBA{0xFF, 0x0, 0xFF, 0xFF}
 //
 // The settings are:
 //  center      // the point at which the graph is centered.
-//  xResolution // the width of the graph in pixels (recommended to be 1000).
-//  yResolution // the height of the graph in pixels (recommended to be 1000).
+//  xResolution // the width of the graph in pixels.
+//  yResolution // the height of the graph in pixels.
 //  viewX       // the width of the viewing area. For example, a viewX of 1.0 will provide a graph spanning the horizontally closed interval [center.X - 1.0, center.X + 1.0].
 //  viewY       // the height of the viewing area. For example, a viewY of 1.0 will provide a graph spanning the vertically closed interval [center.Y - 1.0, center.Y + 1.0].
 //  xRenderStep // the detail the polynomial curves are rendered at. The closer this positive value is to 0.0, the more precise the curves will be (recommended to be 0.01).
@@ -171,7 +171,7 @@ func (g *RealPolynomialGraph) renderAxisAndGrid() error {
 			tmpPt := g.mapPointToViewport(Point{x, 0.0})
 
 			// Skip x == 0.0 (if the axis lines are actually being drawn) since we want the axis lines to go on top of everything.
-			if !g.options.ShowAxis || RoundToNearestUnit(x, g.gridStep) != 0.0 {
+			if !g.options.ShowAxis || roundToNearestUnit(x, g.gridStep) != 0.0 {
 				drawLineBresenham(ctx, int(tmpPt.X), 0, int(tmpPt.X), g.yResolution)
 			}
 		}
@@ -180,7 +180,7 @@ func (g *RealPolynomialGraph) renderAxisAndGrid() error {
 		for x := math.Ceil(g.center.X); x < g.center.X+g.hViewX; x += g.gridStep {
 			tmpPt := g.mapPointToViewport(Point{x, 0.0})
 
-			if !g.options.ShowAxis || RoundToNearestUnit(x, g.gridStep) != 0.0 {
+			if !g.options.ShowAxis || roundToNearestUnit(x, g.gridStep) != 0.0 {
 				drawLineBresenham(ctx, int(tmpPt.X), 0, int(tmpPt.X), g.yResolution)
 			}
 		}
@@ -189,7 +189,7 @@ func (g *RealPolynomialGraph) renderAxisAndGrid() error {
 		for y := math.Floor(g.center.Y); y > g.center.Y-g.hViewY; y -= g.gridStep {
 			tmpPt := g.mapPointToViewport(Point{0.0, y})
 
-			if !g.options.ShowAxis || RoundToNearestUnit(y, g.gridStep) != 0.0 {
+			if !g.options.ShowAxis || roundToNearestUnit(y, g.gridStep) != 0.0 {
 				drawLineBresenham(ctx, 0, int(tmpPt.Y), g.xResolution, int(tmpPt.Y))
 			}
 		}
@@ -199,7 +199,7 @@ func (g *RealPolynomialGraph) renderAxisAndGrid() error {
 			tmpPt := g.mapPointToViewport(Point{0.0, y})
 
 			// Skip y == 0.0 (if the axis lines are actually being drawn) since we want the axis lines to go on top of everything.
-			if !g.options.ShowAxis || RoundToNearestUnit(y, g.gridStep) != 0.0 {
+			if !g.options.ShowAxis || roundToNearestUnit(y, g.gridStep) != 0.0 {
 				drawLineBresenham(ctx, 0, int(tmpPt.Y), g.xResolution, int(tmpPt.Y))
 			}
 		}
@@ -232,6 +232,10 @@ func (g *RealPolynomialGraph) renderPolynomials() error {
 	ctx := g.context
 	rand.Seed(time.Now().UnixNano())
 
+	var currGraphY, prevGraphY float64
+	var prevPt Point
+	var currIsInView, prevIsInView bool
+
 	for _, p := range g.elements {
 
 		// We'll use a random dark colour for each polynomial.
@@ -241,12 +245,21 @@ func (g *RealPolynomialGraph) renderPolynomials() error {
 			rand.Float64()*0.8,
 		)
 
-		prevPt := g.mapPointToViewport(Point{g.center.X - g.hViewX, p.At(g.center.X - g.hViewX)})
+		prevGraphY = p.At(g.center.X - g.hViewX)
+		prevPt = g.mapPointToViewport(Point{g.center.X - g.hViewX, prevGraphY})
 
 		for x := g.center.X - g.hViewX + g.xRenderStep; x < g.center.X+g.hViewX; x += g.xRenderStep {
-			currPt := g.mapPointToViewport(Point{x, p.At(x)})
-			drawLineBresenham(ctx, int(prevPt.X), int(prevPt.Y), int(currPt.X), int(currPt.Y))
-			prevPt = currPt
+			currGraphY = p.At(x)
+
+			currIsInView = (g.center.Y-g.hViewY <= currGraphY && currGraphY <= g.center.Y+g.hViewY)
+			prevIsInView = (g.center.Y-g.hViewY <= prevGraphY && prevGraphY <= g.center.Y+g.hViewY)
+
+			if (currIsInView && prevIsInView) || (currIsInView && !prevIsInView) || (!currIsInView && prevIsInView) {
+				currPt := g.mapPointToViewport(Point{x, currGraphY})
+				drawLineBresenham(ctx, int(prevPt.X), int(prevPt.Y), int(currPt.X), int(currPt.Y))
+				prevPt = currPt
+				prevGraphY = currGraphY
+			}
 		}
 	}
 
@@ -327,35 +340,36 @@ func (g *RealPolynomialGraph) renderLabels() error {
 			if x == 0.0 {
 				zeroDrawn = true
 			}
-			tmpPt = g.mapPointToViewport(Point{x + 0.05, 0.05})
+
+			tmpPt = g.mapPointToViewport(Point{x, 0.0})
 			if alernate {
 				// The "%g" format removes all trailing zeroes. I hope who ever came up with that lives a long, healthy life.
-				ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X, tmpPt.Y, 0.0, 0.0)
+				ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X+1, tmpPt.Y-1, 0.0, 0.0)
 			} else {
-				ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X, tmpPt.Y, 0.0, 1.0)
+				ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X+1, tmpPt.Y+ctx.FontHeight()+1, 0.0, 0.0)
 			}
 
 			alernate = !alernate
 		}
 
 		alernate = !alernate
+		if !zeroDrawn {
+			tmpPt = g.mapPointToViewport(Point{0.0, 0.0})
+			if alernate {
+				ctx.DrawStringAnchored(fmt.Sprintf("%g", 0.0), tmpPt.X+1, tmpPt.Y-1, 0.0, 0.0)
+			} else {
+				ctx.DrawStringAnchored(fmt.Sprintf("%g", 0.0), tmpPt.X+1, tmpPt.Y+ctx.FontHeight()+1, 0.0, 0.0)
+			}
+		}
+
 		// Center to right x.
 		for x := math.Ceil(g.center.X); x < g.center.X+g.hViewX; x += g.gridStep {
-			if x == 0.0 {
-				if !zeroDrawn {
-					tmpPt = g.mapPointToViewport(Point{x + 0.05, 0.05})
-					if alernate {
-						ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X, tmpPt.Y, 0.0, 0.0)
-					} else {
-						ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X, tmpPt.Y, 0.0, 1.0)
-					}
-				}
-			} else {
-				tmpPt = g.mapPointToViewport(Point{x + 0.05, 0.05})
+			if x != 0.0 {
+				tmpPt = g.mapPointToViewport(Point{x, 0.0})
 				if alernate {
-					ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X, tmpPt.Y, 0.0, 0.0)
+					ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X+1, tmpPt.Y-1, 0.0, 0.0)
 				} else {
-					ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X, tmpPt.Y, 0.0, 1.0)
+					ctx.DrawStringAnchored(fmt.Sprintf("%g", x), tmpPt.X+1, tmpPt.Y+ctx.FontHeight()+1, 0.0, 0.0)
 				}
 			}
 
@@ -364,17 +378,17 @@ func (g *RealPolynomialGraph) renderLabels() error {
 
 		// Center to top y.
 		for y := math.Ceil(g.center.Y); y < g.center.Y+g.viewY; y += g.gridStep {
-			if RoundToNearestUnit(y, g.gridStep) != 0.0 { // Ignore 0.
-				tmpPt := g.mapPointToViewport(Point{0.05, y + 0.05})
-				ctx.DrawStringAnchored(fmt.Sprintf("%g", y), tmpPt.X, tmpPt.Y, 0.0, 0.0)
+			if roundToNearestUnit(y, g.gridStep) != 0.0 { // Ignore 0.
+				tmpPt := g.mapPointToViewport(Point{0.0, y})
+				ctx.DrawStringAnchored(fmt.Sprintf("%g", y), tmpPt.X+1, tmpPt.Y-ctx.FontHeight()-1, 0.0, 1.0)
 			}
 		}
 
 		// Center to bottom y.
 		for y := math.Floor(g.center.Y); y > g.center.Y-g.hViewY-g.gridStep; y -= g.gridStep {
-			if RoundToNearestUnit(y, g.gridStep) != 0.0 { // Ignore 0.
-				tmpPt := g.mapPointToViewport(Point{0.05, y + 0.05})
-				ctx.DrawStringAnchored(fmt.Sprintf("%g", y), tmpPt.X, tmpPt.Y, 0.0, 0.0)
+			if roundToNearestUnit(y, g.gridStep) != 0.0 { // Ignore 0.
+				tmpPt := g.mapPointToViewport(Point{0.0, y})
+				ctx.DrawStringAnchored(fmt.Sprintf("%g", y), tmpPt.X+1, tmpPt.Y-ctx.FontHeight()-1, 0.0, 1.0)
 			}
 		}
 	}
