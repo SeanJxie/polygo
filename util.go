@@ -10,10 +10,10 @@ func roundToNearestUnit(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
 }
 
-func removeDuplicateFloat(intSlice []float64) []float64 {
+func removeDuplicateFloat(fSlice []float64) []float64 {
 	allKeys := make(map[float64]bool)
 	list := []float64{}
-	for _, item := range intSlice {
+	for _, item := range fSlice {
 		if _, value := allKeys[item]; !value {
 			allKeys[item] = true
 			list = append(list, item)
