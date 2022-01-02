@@ -29,7 +29,7 @@ func main() {
 	p1, _ := polygo.NewRealPolynomial([]float64{0, -2, 0, 1})
 	p2, _ := polygo.NewRealPolynomial([]float64{-5, -2, 5, 1})
 
-	graphOptions := GraphOptions{
+	graphOptions := polygo.GraphOptions{
 		ShowIntersections:      true,
 		ShowAxis:               true,
 		ShowAxisLabels:         true,
@@ -40,7 +40,7 @@ func main() {
 		ShowGrid:               true,
 	}
 
-	graph, _ := NewGraph([]*RealPolynomial{p2, p1}, Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
+	graph, _ := polygo.NewGraph([]*polygo.RealPolynomial{p2, p1}, polygo.Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
 	graph.SaveAsPNG("graph1.png")
 }
 ```
