@@ -2,14 +2,24 @@ package polygo
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 )
 
-func TestGraph(t *testing.T) {
-	p1, _ := NewRealPolynomial([]float64{0, -2, 0, 1})
-	p2, _ := NewRealPolynomial([]float64{-5, -2, 5, 1})
-	fmt.Println(p1)
-	fmt.Println(p2)
+func TestGraphBasic(t *testing.T) {
+	p1, err := NewRealPolynomial([]float64{0, -2, 0, 1})
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	p2, err := NewRealPolynomial([]float64{-5, -2, 5, 1})
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	t.Log(p1)
+	t.Log(p2)
 
 	graphOptions := GraphOptions{
 		ShowIntersections:      true,
@@ -22,13 +32,101 @@ func TestGraph(t *testing.T) {
 		ShowGrid:               true,
 	}
 
-	graph, err := NewGraph([]*RealPolynomial{p2, p1}, Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
+	graph, err := NewGraph([]*RealPolynomial{p2, p1}, Point{X: 0, Y: 0}, 1000, 1000, 10, 10, 0.01, 1.0, &graphOptions)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 
-	err = graph.SaveAsPNG("test.png")
+	err = graph.SaveAsPNG("TestGraphBasic.png")
 	if err != nil {
 		t.Fatalf("error: %v\n", err)
+	}
+}
+
+func TestGraphStress(t *testing.T) {
+	start := time.Now()
+
+	rand.Seed(time.Now().UnixNano())
+
+	nPolynomials := 15
+	nCoeffs := 3
+	coeffMax := 1.0
+	coeffMin := -1.0
+
+	polynomials := make([]*RealPolynomial, nPolynomials)
+
+	var err error
+
+	for i := 0; i < nPolynomials; i++ {
+		tmpCoeffs := make([]float64, nCoeffs)
+
+		for j := 0; j < nCoeffs; j++ {
+			tmpCoeffs[j] = coeffMin + rand.Float64()*(coeffMax-coeffMin)
+		}
+
+		polynomials[i], err = NewRealPolynomial(tmpCoeffs)
+		if err != nil {
+			t.Fatalf("error: %v\n", err)
+		}
+	}
+
+	graphOptions := GraphOptions{
+		ShowIntersections:      false,
+		ShowAxis:               true,
+		ShowAxisLabels:         true,
+		ShowIntersectionLabels: false,
+		ShowRootLabels:         false,
+		ShowRoots:              false,
+		ShowYintercepts:        false,
+		ShowGrid:               true,
+	}
+
+	graph, err := NewGraph(polynomials, Point{X: 0, Y: 0}, 4000, 4000, 50, 100, 0.01, 1, &graphOptions)
+	if err != nil {
+		t.Fatalf("error: %v\n", err)
+	}
+
+	elapsed := time.Since(start)
+	t.Logf("init runtime: %s\n", elapsed)
+
+	start = time.Now()
+	err = graph.SaveAsPNG("TestGraphStress.png")
+	elapsed = time.Since(start)
+	if err != nil {
+		t.Fatalf("error: %v\n", err)
+	}
+
+	t.Logf("runtime: %s\n", elapsed)
+}
+
+func TestGraphFrameAnimation(t *testing.T) {
+	graphOptions := GraphOptions{
+		ShowIntersections:      true,
+		ShowAxis:               true,
+		ShowAxisLabels:         true,
+		ShowIntersectionLabels: true,
+		ShowRootLabels:         true,
+		ShowRoots:              true,
+		ShowYintercepts:        true,
+		ShowGrid:               true,
+	}
+
+	frameCount := 0
+	for a := -10.0; a <= 10.0; a += 0.1 {
+		p1, err := NewRealPolynomial([]float64{0, -2, 0, a})
+		if err != nil {
+			t.Fatalf("error: %v", err)
+		}
+
+		graph, err := NewGraph([]*RealPolynomial{p1}, Point{X: 0, Y: 0}, 1000, 1000, 10, 10, 0.01, 1.0, &graphOptions)
+		if err != nil {
+			t.Fatalf("error: %v", err)
+		}
+
+		err = graph.SaveAsPNG(fmt.Sprintf("frame_%d.png", frameCount))
+		if err != nil {
+			t.Fatalf("error: %v\n", err)
+		}
+		frameCount++
 	}
 }
