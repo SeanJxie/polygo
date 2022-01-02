@@ -1,7 +1,10 @@
 package polygo
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 )
 
 var Cons1, Cons2, Line1, Line2, Line3, Line4, Quad1, Quad2, Quad3, Cube1, Cube2, Cube3 *RealPolynomial
@@ -149,7 +152,7 @@ func TestQuadCoefficients(t *testing.T) {
 	quad, _ := NewRealPolynomial(quadCoefficients)
 	root, _ := quad.FindRootWithin(-1, 1)
 
-	quadraticExpression := quad.Expr()
+	quadraticExpression := quad.String()
 	if quadraticExpression != "0.000000x^0 + 0.000000x^1 + 2.000000x^2" {
 		t.Fatalf("error in calculation -'%v'", quadraticExpression)
 	}
@@ -165,12 +168,12 @@ func TestFindDerivate(t *testing.T) {
 	poly, _ := NewRealPolynomial(coeffs)
 	derivate := poly.Derivative()
 
-	polyExpress := poly.Expr()
+	polyExpress := poly.String()
 	if polyExpress != "5.000000x^0 + 2.000000x^1 + 5.000000x^2 + 2.000000x^3 + 63.000000x^4 + 1.000000x^5 + 2.000000x^6 + 5.000000x^7 + 1.000000x^8" {
 		t.Fatalf("error in calculation -'%v'", polyExpress)
 	}
 
-	valDerivate := derivate.Expr()
+	valDerivate := derivate.String()
 	if valDerivate != "2.000000x^0 + 10.000000x^1 + 6.000000x^2 + 252.000000x^3 + 5.000000x^4 + 12.000000x^5 + 35.000000x^6 + 8.000000x^7" {
 		t.Fatalf("error in calculation -'%v'", valDerivate)
 	}
