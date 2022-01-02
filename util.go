@@ -6,8 +6,20 @@ import "math"
 This file contains general utility functions used throughout the library.
 */
 
-func RoundToNearestUnit(x, unit float64) float64 {
+func roundToNearestUnit(x, unit float64) float64 {
 	return math.Round(x/unit) * unit
+}
+
+func removeDuplicateFloat(intSlice []float64) []float64 {
+	allKeys := make(map[float64]bool)
+	list := []float64{}
+	for _, item := range intSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
 }
 
 // Strip all leading zeroes in the slice s. If the entire slice is filled with 0, the first element will be kept.
