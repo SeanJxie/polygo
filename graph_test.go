@@ -48,10 +48,10 @@ func TestGraphStress(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 
-	nPolynomials := 15
-	nCoeffs := 3
-	coeffMax := 1.0
-	coeffMin := -1.0
+	nPolynomials := 500
+	nCoeffs := 2
+	coeffMax := 10.0
+	coeffMin := -10.0
 
 	polynomials := make([]*RealPolynomial, nPolynomials)
 
@@ -71,17 +71,23 @@ func TestGraphStress(t *testing.T) {
 	}
 
 	graphOptions := GraphOptions{
-		ShowIntersections:      false,
-		ShowAxis:               true,
-		ShowAxisLabels:         true,
-		ShowIntersectionLabels: false,
-		ShowRootLabels:         false,
-		ShowRoots:              false,
-		ShowYintercepts:        false,
-		ShowGrid:               true,
+		ShowIntersections:      true,
+		ShowIntersectionLabels: true,
+
+		ShowRoots:      true,
+		ShowRootLabels: true,
+
+		ShowYintercepts:      true,
+		ShowYinterceptLabels: true,
+
+		ShowAxis:       true,
+		ShowAxisLabels: true,
+		ShowGrid:       true,
+
+		DarkMode: false,
 	}
 
-	graph, err := NewGraph(polynomials, Point{X: 0, Y: 0}, 4000, 4000, 50, 100, 0.01, 1, &graphOptions)
+	graph, err := NewGraph(polynomials, Point{X: 0, Y: 0}, 5000, 5000, 50, 50, 0.001, 1, &graphOptions)
 	if err != nil {
 		t.Fatalf("error: %v\n", err)
 	}
