@@ -56,6 +56,7 @@ type RealPolynomialGraph struct {
 //  ShowIntersectionLabsls // label intersection points.
 //  ShowRootLabels         // label roots.
 //  ShowYinterceptLabels   // label y-intercepts.
+//  DarkMode               // produce a dark-themed graph.
 type GraphOptions struct {
 	ShowAxis          bool
 	ShowGrid          bool
@@ -67,6 +68,8 @@ type GraphOptions struct {
 	ShowIntersectionLabels bool
 	ShowRootLabels         bool
 	ShowYinterceptLabels   bool
+
+	DarkMode bool
 }
 
 // Some colour definitions
@@ -160,12 +163,16 @@ func (g *RealPolynomialGraph) renderAxisAndGrid() error {
 	ctx := g.context
 
 	// Set background colour.
-	ctx.SetColor(colWhite)
+	if g.options.DarkMode {
+		ctx.SetColor(colBlack)
+	} else {
+		ctx.SetColor(colWhite)
+	}
 	ctx.Clear()
 
-	ctx.SetColor(colGray)
-
 	if g.options.ShowGrid {
+		ctx.SetColor(colGray)
+
 		// Left center to left x.
 		for x := math.Floor(g.center.X); x > g.center.X-g.hViewX; x -= g.gridStep {
 			tmpPt := g.mapPointToViewport(Point{x, 0.0})
@@ -213,7 +220,11 @@ func (g *RealPolynomialGraph) renderAxisAndGrid() error {
 
 		origin := g.mapPointToViewport(Point{0.0, 0.0})
 
-		ctx.SetColor(colBlackTrans) // Axis lines will be darker
+		if g.options.DarkMode {
+			ctx.SetColor(colWhite)
+		} else {
+			ctx.SetColor(colBlack) // Axis lines will be darker
+		}
 
 		if xAxisInViewport { // Draw x-axis if visible
 			drawLineBresenham(ctx, int(origin.X), 0, int(origin.X), g.yResolution)
@@ -238,12 +249,19 @@ func (g *RealPolynomialGraph) renderPolynomials() error {
 
 	for _, p := range g.elements {
 
-		// We'll use a random dark colour for each polynomial.
-		ctx.SetRGB(
-			rand.Float64()*0.8,
-			rand.Float64()*0.8,
-			rand.Float64()*0.8,
-		)
+		if g.options.DarkMode {
+			ctx.SetRGB(
+				0.8+rand.Float64()*(0.3),
+				0.8+rand.Float64()*(0.3),
+				0.8+rand.Float64()*(0.3),
+			)
+		} else { // We'll use a random dark colour for each polynomial.
+			ctx.SetRGB(
+				rand.Float64()*0.8,
+				rand.Float64()*0.8,
+				rand.Float64()*0.8,
+			)
+		}
 
 		prevGraphY = p.At(g.center.X - g.hViewX)
 		prevPt = g.mapPointToViewport(Point{g.center.X - g.hViewX, prevGraphY})
@@ -254,12 +272,15 @@ func (g *RealPolynomialGraph) renderPolynomials() error {
 			currIsInView = (g.center.Y-g.hViewY <= currGraphY && currGraphY <= g.center.Y+g.hViewY)
 			prevIsInView = (g.center.Y-g.hViewY <= prevGraphY && prevGraphY <= g.center.Y+g.hViewY)
 
+			currPt := g.mapPointToViewport(Point{x, currGraphY})
+
+			// Render up to one point out of view.
 			if (currIsInView && prevIsInView) || (currIsInView && !prevIsInView) || (!currIsInView && prevIsInView) {
-				currPt := g.mapPointToViewport(Point{x, currGraphY})
 				drawLineBresenham(ctx, int(prevPt.X), int(prevPt.Y), int(currPt.X), int(currPt.Y))
-				prevPt = currPt
-				prevGraphY = currGraphY
 			}
+
+			prevPt = currPt
+			prevGraphY = currGraphY
 		}
 	}
 
@@ -275,7 +296,6 @@ func (g *RealPolynomialGraph) renderPointIndicators() error {
 	markerRad := g.mapPointToViewport(Point{g.center.X - (g.hViewX) + 0.08, 0.0}).X
 
 	for _, p := range g.elements {
-
 		if g.options.ShowRoots {
 			ctx.SetColor(colBlue)
 			roots, err := p.FindRootsWithin(g.center.X-g.hViewX, g.center.X+g.hViewX)
@@ -328,7 +348,12 @@ func (g *RealPolynomialGraph) renderPointIndicators() error {
 // Render the axis and/or point indicator labels.
 func (g *RealPolynomialGraph) renderLabels() error {
 	ctx := g.context
-	ctx.SetColor(colBlack)
+
+	if g.options.DarkMode {
+		ctx.SetColor(colWhite)
+	} else {
+		ctx.SetColor(colBlack)
+	}
 
 	if g.options.ShowAxisLabels {
 		alernate := true
@@ -393,39 +418,22 @@ func (g *RealPolynomialGraph) renderLabels() error {
 		}
 	}
 
-	// Process significant points if they have not already been processed via renderPointIndicators.
-	if g.intersections == nil {
-		for _, p := range g.elements {
-			for _, p2 := range g.elements {
-				if !p.Equal(p2) {
-					tmp, err := p.FindIntersectionsWithin(g.center.X-g.hViewX, g.center.X+g.hViewX, p2)
-					if err != nil {
-						return err
+	if g.options.ShowIntersectionLabels {
+		// Process significant points if they have not already been processed via renderPointIndicators.
+		if g.intersections == nil {
+			for _, p := range g.elements {
+				for _, p2 := range g.elements {
+					if !p.Equal(p2) {
+						tmp, err := p.FindIntersectionsWithin(g.center.X-g.hViewX, g.center.X+g.hViewX, p2)
+						if err != nil {
+							return err
+						}
+						g.intersections = append(g.intersections, tmp...)
 					}
-					g.intersections = append(g.intersections, tmp...)
 				}
 			}
 		}
-	}
 
-	if g.roots == nil {
-		for _, p := range g.elements {
-			roots, err := p.FindRootsWithin(g.center.X-g.hViewX, g.center.X+g.hViewX)
-			if err != nil {
-				return err
-			}
-			g.roots = append(g.roots, roots...)
-		}
-	}
-
-	if g.yIntercepts == nil {
-		for _, p := range g.elements {
-			yInt := p.At(0.0)
-			g.yIntercepts = append(g.yIntercepts, yInt)
-		}
-	}
-
-	if g.options.ShowIntersectionLabels {
 		ctx.SetColor(colMagenta)
 		for _, pt := range g.intersections {
 			tmpPt := g.mapPointToViewport(Point{pt.X + 0.05, pt.Y + 0.05})
@@ -434,6 +442,16 @@ func (g *RealPolynomialGraph) renderLabels() error {
 	}
 
 	if g.options.ShowRootLabels {
+		if g.roots == nil {
+			for _, p := range g.elements {
+				roots, err := p.FindRootsWithin(g.center.X-g.hViewX, g.center.X+g.hViewX)
+				if err != nil {
+					return err
+				}
+				g.roots = append(g.roots, roots...)
+			}
+		}
+
 		ctx.SetColor(colBlue)
 
 		alternate := true
@@ -450,6 +468,13 @@ func (g *RealPolynomialGraph) renderLabels() error {
 	}
 
 	if g.options.ShowYinterceptLabels {
+		if g.yIntercepts == nil {
+			for _, p := range g.elements {
+				yInt := p.At(0.0)
+				g.yIntercepts = append(g.yIntercepts, yInt)
+			}
+		}
+
 		ctx.SetColor(colGreen)
 		for _, y := range g.yIntercepts {
 			tmpPt := g.mapPointToViewport(Point{0.05, y + 0.05})
