@@ -1,8 +1,8 @@
 # polygo
-`polygo` is a fast, light-weight library of tools that make working with polynomials easy in Go.
+`polygo` is a light-weight library that makes working with polynomials possible and easy in Go.
 
 ## What's New
-- A graphing tool
+- A robust graphing tool
 
 ## What's to Come
 - More polynomial tools (integration, critial point finding, binomial expansion, etc.)
@@ -29,15 +29,21 @@ func main() {
 	p1, _ := polygo.NewRealPolynomial([]float64{0, -2, 0, 1})
 	p2, _ := polygo.NewRealPolynomial([]float64{-5, -2, 5, 1})
 
-	graphOptions := polygo.GraphOptions{
-		ShowIntersections:      true,
-		ShowAxis:               true,
-		ShowAxisLabels:         true,
-		ShowIntersectionLabels: true,
-		ShowRootLabels:         true,
-		ShowRoots:              true,
-		ShowYintercepts:        true,
-		ShowGrid:               true,
+	graphOptions := GraphOptions{
+		ShowIntersections:      false,
+		ShowIntersectionLabels: false,
+
+		ShowRoots:      false,
+		ShowRootLabels: false,
+
+		ShowYintercepts:      false,
+		ShowYinterceptLabels: false,
+
+		ShowAxis:       false,
+		ShowAxisLabels: false,
+		ShowGrid:       false,
+
+		DarkMode: false,
 	}
 
 	graph, _ := polygo.NewGraph([]*polygo.RealPolynomial{p2, p1}, polygo.Point{X: 0, Y: 0}, 1000, 1000, 5, 5, 0.01, 1.0, &graphOptions)
@@ -47,7 +53,9 @@ func main() {
 Output:
 ![graph1.png](https://github.com/SeanJxie/polygo/blob/main/graph_samples/graph1.png)
 
-- Create a simple quadratic and find the root:
+>You can find some more image examples in the [`graph_samples`](https://github.com/SeanJxie/polygo/tree/main/graph_samples) folder.
+
+- Create a simple quadratic and find its root:
 ```go
 package main
 
@@ -62,7 +70,7 @@ func main() {
 
 	root, _ := quad.FindRootWithin(-1, 1)
 	
-	quad.PrintExpr()
+	fmt.Println(quad)
 	fmt.Printf("Root: %f\n", root) 
 }
 ```
@@ -72,7 +80,7 @@ Output:
 Root: 0.000000
 ```
 
-- Create a polynomial and find the derivative:
+- Create a polynomial and find its derivative:
 ```go
 package main
 
@@ -84,8 +92,8 @@ func main() {
 	coeffs := []float64{5, 2, 5, 2, 63, 1, 2, 5, 1}
 	poly, _ := polygo.NewRealPolynomial(coeffs)
 	deriv := poly.Derivative()
-	poly.PrintExpr()
-	deriv.PrintExpr()
+	fmt.Println(poly)
+	fmt.Println(deriv)
 }
 ```
 Output:
@@ -100,8 +108,8 @@ Output:
 func main() {
 	cubic, _ := polygo.NewRealPolynomial([]float64{0, -2, 0, 1})
 	affine, _ := polygo.NewRealPolynomial([]float64{3, 5})
-	cubic.PrintExpr()
-	affine.PrintExpr()
+	fmt.Println(cubic)
+	fmt.Println(affine)
 	intersections, err := cubic.FindIntersectionsWithin(-10, 10, affine)
 
 	if err != nil {
