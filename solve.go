@@ -75,7 +75,7 @@ func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
 	if rp.At(a) == 0.0 {
 		return append(rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), a), nil
 	}
-	return removeDuplicateFloat(rp.findRootsWithinAcc(a, b, nil, rp.sturmChain())), nil
+	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), nil
 }
 
 // findRootsWithinAcc is an accumulative implmentation of a hybrid Bisection Method through recursion.
@@ -83,7 +83,7 @@ func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
 func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
 	nRoots := rp.countRootsWithinWSC(a, b, chain)
 	if nRoots > 1 {
-		mp := (a + b) / 2
+		mp := (a + b) / 2.0
 		return append(
 			rp.findRootsWithinAcc(a, mp, roots, chain),
 			rp.findRootsWithinAcc(mp, b, roots, chain)...,
@@ -125,7 +125,6 @@ func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynom
 		return nil, err
 	}
 
-	roots = removeDuplicateFloat(roots)
 	points := make([]Point, len(roots))
 
 	for i, x := range roots {
@@ -144,6 +143,7 @@ with suffix "WSC" are such that the overhead caused by recomputing the Sturm cha
 
 func (rp *RealPolynomial) findRootWithinWSC(a, b float64, chain []*RealPolynomial) (float64, error) {
 	nRootsWithin := rp.countRootsWithinWSC(a, b, chain)
+	abMid := (a + b) / 2.0
 
 	if nRootsWithin == 0 {
 		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
@@ -155,7 +155,7 @@ func (rp *RealPolynomial) findRootWithinWSC(a, b float64, chain []*RealPolynomia
 
 	// Implement Newton's Method
 	deriv := rp.Derivative()
-	guess := (a + b) / 2
+	guess := abMid
 	var derivAtGuess float64
 	for i := 0; i < globalNewtonIterations; i++ {
 		derivAtGuess = deriv.At(guess)
@@ -171,6 +171,17 @@ func (rp *RealPolynomial) findRootWithinWSC(a, b float64, chain []*RealPolynomia
 		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
 	}
 
+	// Recall that Newton's method does not operate on an interval.
+	// In the case that we've found a solution outside of the given interval, bisect the interval and try on each half.
+	if !(a < guess && guess <= b) {
+		retryLeft, err1 := rp.findRootWithinWSC(a, abMid, chain)
+		retryRight, err2 := rp.findRootWithinWSC(abMid, b, chain)
+		if err1 == nil {
+			return retryLeft, nil
+		} else if err2 == nil {
+			return retryRight, nil
+		}
+	}
 	return guess, nil
 }
 
