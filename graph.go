@@ -441,9 +441,9 @@ func (g *RealPolynomialGraph) renderLabels() error {
 		for _, x := range g.roots {
 			tmpPt := g.mapPointToViewport(Point{x + 0.05, 0.05})
 			if alternate { // Alternate the root labels to minimize cluster.
-				ctx.DrawStringAnchored(fmt.Sprintf("(%.2f, %f)", x, 0.0), tmpPt.X, tmpPt.Y, 0.0, 0.0)
+				ctx.DrawStringAnchored(fmt.Sprintf("(%.2f, %.2f)", x, 0.0), tmpPt.X, tmpPt.Y, 0.0, 0.0)
 			} else {
-				ctx.DrawStringAnchored(fmt.Sprintf("(%.2f, %f)", x, 0.0), tmpPt.X, tmpPt.Y, 0.0, 1.0)
+				ctx.DrawStringAnchored(fmt.Sprintf("(%.2f, %.2f)", x, 0.0), tmpPt.X, tmpPt.Y, 0.0, 1.0)
 			}
 			alternate = !alternate
 		}
@@ -453,7 +453,7 @@ func (g *RealPolynomialGraph) renderLabels() error {
 		ctx.SetColor(colGreen)
 		for _, y := range g.yIntercepts {
 			tmpPt := g.mapPointToViewport(Point{0.05, y + 0.05})
-			ctx.DrawStringAnchored(fmt.Sprintf("(%f, %.2f)", 0.0, y), tmpPt.X, tmpPt.Y, 0.0, 0.0)
+			ctx.DrawStringAnchored(fmt.Sprintf("(%.2f, %.2f)", 0.0, y), tmpPt.X, tmpPt.Y, 0.0, 0.0)
 		}
 	}
 
