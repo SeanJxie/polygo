@@ -30,18 +30,18 @@ func main() {
 	p2, _ := polygo.NewRealPolynomial([]float64{-5, -2, 5, 1})
 
 	graphOptions := GraphOptions{
-		ShowIntersections:      false,
-		ShowIntersectionLabels: false,
+		ShowIntersections:      true,
+		ShowIntersectionLabels: true,
 
-		ShowRoots:      false,
-		ShowRootLabels: false,
+		ShowRoots:      true,
+		ShowRootLabels: true,
 
-		ShowYintercepts:      false,
-		ShowYinterceptLabels: false,
+		ShowYintercepts:      true,
+		ShowYinterceptLabels: true,
 
-		ShowAxis:       false,
-		ShowAxisLabels: false,
-		ShowGrid:       false,
+		ShowAxis:       true,
+		ShowAxisLabels: true,
+		ShowGrid:       true,
 
 		DarkMode: false,
 	}
