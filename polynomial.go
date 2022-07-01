@@ -1,9 +1,5 @@
 package polygo
 
-/*
-This file contains polynomial type defintions and general operations.
-*/
-
 import (
 	"errors"
 	"fmt"
@@ -20,40 +16,31 @@ type Point struct {
 	X, Y float64
 }
 
-/* --- BEGIN GLOBAL SETTINGS --- */
 // The number of iterations used in Newton's Method implmentation in root solving functions.
-var globalNewtonIterations = 25
+var (
+	globalNewtonIterations = 25
+)
 
-/* --- END GLOBAL SETTINGS --- */
-
-/* --- BEGIN STRUCT METHODS --- */
-
-// NumCoeffs returns the number of coefficients of the current instance.
+// NumCoeffs returns the number of coefficients the polynomial contains.
 func (rp *RealPolynomial) NumCoeffs() int {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
 	return len(rp.coeffs)
 }
 
-// Degree returns the degree of the current instance.
-func (rp *RealPolynomial) Degree() int {
-	if rp == nil {
-		panic("received nil RealPolynomial")
-	}
-	// Coefficients should be maintained in such a way that allow the
-	// number of coefficients to be one less than the degree of the polynomial.
-	return len(rp.coeffs) - 1
+// LeadCoeff Returns the coefficient of the highest degree term of the current instance.
+func (rp *RealPolynomial) LeadCoeff() float64 {
+	return rp.coeffs[len(rp.coeffs)-1]
 }
 
-// At returns the value of the current instance evaluated at x.
+// Degree returns the degree of the polynomial.
+func (rp *RealPolynomial) Degree() int {
+	// Coefficients should be maintained in such a way that allow the
+	// number of coefficients to be one less than the degree of the polynomial.
+	return rp.NumCoeffs() - 1
+}
+
+// At returns the value of the polynomial evaluated at x.
 func (rp *RealPolynomial) At(x float64) float64 {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	// Implement Horner's Method
-
 	length := len(rp.coeffs)
 	out := rp.coeffs[length-1]
 	for i := length - 2; i >= 0; i-- {
@@ -62,16 +49,12 @@ func (rp *RealPolynomial) At(x float64) float64 {
 	return out
 }
 
-// Derivative returns the derivative of the current instance.
-// The current instance is not modified.
+// Derivative returns the derivative of the polynomial.
 func (rp *RealPolynomial) Derivative() *RealPolynomial {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
 	// In the case that the polynomial is constant, the derivative has the same number of terms.
 	// We deal with this case knowing that the derivative of any real constant is 0.
 	if rp.Degree() == 0 {
-		deriv, _ := NewRealPolynomial([]float64{0}) // safe call
+		deriv, _ := NewRealPolynomial([]float64{0})
 		return deriv
 	}
 
@@ -81,40 +64,26 @@ func (rp *RealPolynomial) Derivative() *RealPolynomial {
 		derivativeCoeffs[i] = rp.coeffs[i+1] * float64(i+1)
 	}
 
-	deriv, _ := NewRealPolynomial(derivativeCoeffs) // safe call
+	deriv, _ := NewRealPolynomial(derivativeCoeffs)
 	return deriv
 }
 
-// LeadCoeff Returns the coefficient of the highest degree term of the current instance.
-func (rp *RealPolynomial) LeadCoeff() float64 {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-	return rp.coeffs[len(rp.coeffs)-1]
-}
-
-// ShiftRight shifts the coefficients of each term in the current instance rightwards by offset and returns the resulting polynomial.
-// The current instance is not modified.
-// A right shift by N is equivalent to multipliying the current instance by x^N.
+// ShiftRight returns a new polynomial in which all coefficients of each term
+// are shifted to the right by a specified offset based on the current polynomial.
+//
+// A right shift by N is equivalent to multipliying the current polynomial by x^N.
 func (rp *RealPolynomial) ShiftRight(offset int) *RealPolynomial {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
 	if offset < 0 {
 		panic("invalid offset")
 	}
 	shiftedCoeffs := make([]float64, rp.NumCoeffs()+offset)
 	copy(shiftedCoeffs[offset:], rp.coeffs)
-	rp, _ = NewRealPolynomial(shiftedCoeffs) // safe call
+	rp, _ = NewRealPolynomial(shiftedCoeffs)
 	return rp
 }
 
-// Equal returns true if the current instance is equal to rp2. Otherwise, false is returned.
+// Equal returns true if the polynomial is equal to rp2. Otherwise, false is returned.
 func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
-	if rp1 == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	if rp1.NumCoeffs() != rp2.NumCoeffs() {
 		return false
 	}
@@ -128,39 +97,28 @@ func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
 	return true
 }
 
-// IsZero returns true if current instance is equal to the zero polynomial. Otherwise, false is returned.
+// IsZero returns true if polynomial is equal to the zero polynomial. Otherwise, false is returned.
 func (rp *RealPolynomial) IsZero() bool {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
 	return rp.Degree() == 0 && rp.coeffs[0] == 0.0
 }
 
-// IsDegree returns true if current instance is of degree n. Otherwise, false is returned.
+// IsDegree returns true if polynomial is of degree n. Otherwise, false is returned.
 func (rp *RealPolynomial) IsDegree(n int) bool {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
 	return rp.Degree() == n
 }
 
-// CoeffAtDegree returns the coefficient at degree n.
-//
-// n should be positive.
+// CoeffAtDegree returns the coefficient of the polynomial at degree n.
 func (rp *RealPolynomial) CoeffAtDegree(n int) float64 {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
+	if n < 0 {
+		panic("invalid degree")
 	}
 	return rp.coeffs[n]
 }
 
-// Add adds the current instance and rp2 and returns the sum.
+// Add adds the polynomial to rp2 and returns the sum.
+//
 // The current instance is also set to the sum.
 func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
-	if rp1 == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	var maxNumCoeffs int
 
 	// Pad "shorter" polynomial with 0s.
@@ -191,13 +149,10 @@ func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// Sub subtracts rp2 from the current instance and returns the difference.
+// Sub subtracts rp2 from the polynomial and returns the difference.
+//
 // The current instance is also set to the difference.
 func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
-	if rp1 == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	var maxNumCoeffs int
 
 	// Pad "shorter" polynomial with 0s.
@@ -227,15 +182,12 @@ func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// MulNaive multiplies the current instance with rp2 and returns the product.
+// MulNaive multiplies the polynomial with rp2 and returns the product.
+//
 // The current instance is also set to the product.
 //
-// It is not recommended to use this function. Use Mul instead.
+// It is not recommended to use this function as it is generally slow. Use Mul() instead.
 func (rp1 *RealPolynomial) MulNaive(rp2 *RealPolynomial) *RealPolynomial {
-	if rp1 == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	prodCoeffs := make([]float64, rp1.Degree()+rp2.Degree()+1)
 
 	for i := 0; i < rp1.NumCoeffs(); i++ {
@@ -249,13 +201,10 @@ func (rp1 *RealPolynomial) MulNaive(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// Mul multiplies the current instance with rp2 and returns the product.
+// Mul multiplies the polynomial with rp2 and returns the product.
+//
 // The current instance is also set to the product.
 func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
-	if rp1 == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	lenRp1 := len(rp1.coeffs)
 	lenRp2 := len(rp2.coeffs)
 
@@ -285,7 +234,8 @@ func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
 	return rp1
 }
 
-// MulS multiplies the current instance with the scalar s and returns the product.
+// MulS multiplies the polynomial with a scalar and returns the product.
+//
 // The current instance is also set to the product.
 func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
 	for i := 0; i < len(rp.coeffs); i++ {
@@ -294,7 +244,8 @@ func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
 	return rp
 }
 
-// EuclideanDiv divides the current instance by rp2 and returns the result as a quotient-remainder pair.
+// EuclideanDiv divides the polynomial by rp2 and returns the result as a quotient-remainder pair.
+//
 // The current instance is also set to the quotient.
 func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *RealPolynomial) {
 	if rp1 == nil || rp2 == nil {
@@ -308,7 +259,6 @@ func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *
 	// Using special properties of the ordered coefficient system, we can divide polynomials
 	// via shifts:
 	// https://rosettacode.org/wiki/Polynomial_long_division
-
 	quotCoeffs := make([]float64, rp1.Degree()-rp2.Degree()+1)
 	var d *RealPolynomial
 	var shift int
@@ -329,12 +279,8 @@ func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *
 	return rp1, &rem
 }
 
-// Expr returns a string representation of the current instance in increasing sum form.
+// Expr returns a string representation of the polynomial in increasing sum form.
 func (rp *RealPolynomial) String() string {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	var expr string
 	for d, c := range rp.coeffs {
 		if d == len(rp.coeffs)-1 {
@@ -353,14 +299,8 @@ func (p Point) String() string {
 
 // PrintExpr prints the string expression of the current instance in increasing sum form to standard output.
 func (rp *RealPolynomial) Print() {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
 	fmt.Println(rp)
 }
-
-// --- END STRUCT METHODS ---
 
 // NewRealPolynomial returns a new *RealPolynomial instance with the given coeffs.
 func NewRealPolynomial(coeffs []float64) (*RealPolynomial, error) {
