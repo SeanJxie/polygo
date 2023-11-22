@@ -1,95 +1,266 @@
 package polygo
 
 import (
-	"errors"
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
+
+	"github.com/mjibson/go-dsp/fft"
 )
 
-// A RealPolynomial is represented as a slice of coefficients ordered increasingly by degree.
-// For example, one can imagine: 5x^0 + 4x^1 + (-2)x^2 + ...
-type RealPolynomial struct {
-	coeffs []float64
-}
-
-// A point in R^2.
-type Point struct {
-	X, Y float64
-}
-
-// The number of iterations used in Newton's Method implmentation in root solving functions.
-var (
-	globalNewtonIterations = 25
-)
-
-// NumCoeffs returns the number of coefficients the polynomial contains.
-func (rp *RealPolynomial) NumCoeffs() int {
-	return len(rp.coeffs)
-}
-
-// LeadCoeff Returns the coefficient of the highest degree term of the current instance.
-func (rp *RealPolynomial) LeadCoeff() float64 {
-	return rp.coeffs[len(rp.coeffs)-1]
-}
-
-// Degree returns the degree of the polynomial.
-func (rp *RealPolynomial) Degree() int {
-	// Coefficients should be maintained in such a way that allow the
-	// number of coefficients to be one less than the degree of the polynomial.
-	return rp.NumCoeffs() - 1
-}
-
-// At returns the value of the polynomial evaluated at x.
-func (rp *RealPolynomial) At(x float64) float64 {
-	// Implement Horner's Method
-	length := len(rp.coeffs)
-	out := rp.coeffs[length-1]
-	for i := length - 2; i >= 0; i-- {
-		out = out*x + rp.coeffs[i]
-	}
-	return out
-}
-
-// Derivative returns the derivative of the polynomial.
-func (rp *RealPolynomial) Derivative() *RealPolynomial {
-	// In the case that the polynomial is constant, the derivative has the same number of terms.
-	// We deal with this case knowing that the derivative of any real constant is 0.
-	if rp.Degree() == 0 {
-		deriv, _ := NewRealPolynomial([]float64{0})
-		return deriv
-	}
-
-	nDerivativeCoeffs := len(rp.coeffs) - 1
-	derivativeCoeffs := make([]float64, nDerivativeCoeffs)
-	for i := 0; i < nDerivativeCoeffs; i++ {
-		derivativeCoeffs[i] = rp.coeffs[i+1] * float64(i+1)
-	}
-
-	deriv, _ := NewRealPolynomial(derivativeCoeffs)
-	return deriv
-}
-
-// ShiftRight returns a new polynomial in which all coefficients of each term
-// are shifted to the right by a specified offset based on the current polynomial.
+// A Poly represents a univariate real polynomial.
 //
-// A right shift by N is equivalent to multipliying the current polynomial by x^N.
-func (rp *RealPolynomial) ShiftRight(offset int) *RealPolynomial {
-	if offset < 0 {
-		panic("invalid offset")
-	}
-	shiftedCoeffs := make([]float64, rp.NumCoeffs()+offset)
-	copy(shiftedCoeffs[offset:], rp.coeffs)
-	rp, _ = NewRealPolynomial(shiftedCoeffs)
-	return rp
+// Note: in the documentation for each method of Poly, we refer to the receiver instance as "p".
+type Poly struct {
+	coef []float64
+	len  int
+	deg  int
 }
 
-// Equal returns true if the polynomial is equal to rp2. Otherwise, false is returned.
-func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
-	if rp1.NumCoeffs() != rp2.NumCoeffs() {
+// NewPoly returns a Poly p with the given coefficients.
+//
+// Let c = coefficients and let n = len(c). Then, p is defined by
+//
+//   - p(x) = c[0]x^(n-1) + c[1]x^(n-2) + ... + c[n-2]x^1 + c[n-1]x^0.
+//
+// # Examples:
+//   - NewPoly([]float64{3, -1, 4}) represents p(x) = 3x^2 - x + 4.
+//   - NewPoly([]float64{0}) represents p(x) = 0.
+//   - NewPoly([]float64{0, 0, 0, 2, 0, 0, 7, 0, 0, 1}) represents p(x) = 2x^6 + 7x^3 + 1.
+//
+// Panics if coefficients slice is empty.
+func NewPoly(coefficients []float64) Poly {
+
+	if len(coefficients) == 0 {
+		// When dealing with invalid inputs, polygo will not use the
+		// "return error" convention in order to keep user code less
+		// cluttered. Instead, functions will panic (as opposed to Fatal,
+		// since Fatal calls os.exit(1), whereas panic works it's way up
+		// the call stack and returns a useful stacktrace so we know where
+		// things are going wrong).
+		log.Panic("NewPoly: empty coefficients slice.")
+	}
+
+	// Makes things easier internally to have the degree of a term be the index of its coefficient,
+	// so we reverse the coefficients slice.
+	//
+	// Also, we don't want to deal with arbitrary lengths of leading zeroes in the code. So, we
+	// strip the leading zeroes. This also guarantees that the degree of the polynomial is the
+	// length of the coefficient slice minus 1 (which also happens to be the largest index of the
+	// coefficient slice).
+	coefficients = removeTrailingZeroes(reverse(coefficients))
+	coefLen := len(coefficients)
+
+	return Poly{
+		coef: coefficients,
+		len:  coefLen,
+		deg:  coefLen - 1,
+	}
+}
+
+// newPolyNoReverse is just NewPoly but with no coefficient slice reversal.
+//
+// This is needed because we internally represent coefs as a slice with increasing degree, whereas
+// the user interacts with coefs slices with decreasing degree. So, having this function allows us
+// to return new Polys without having to compensate for the difference in representation
+//
+// Doesn't do the empty panic check like in NewPoly().
+func newPolyNoReverse(coefficients []float64) Poly {
+
+	coefficients = removeTrailingZeroes(coefficients)
+	coefLen := len(coefficients)
+
+	return Poly{
+		coef: coefficients,
+		len:  coefLen,
+		deg:  coefLen - 1,
+	}
+}
+
+// parseTerm returns the coefficient and exponent of a term in string form "(+|-)cx^n".
+func parseTerm(t string) (float64, int) {
+	var xpos, caratpos int
+	var sign, coef float64
+	var deg int64
+	var err error
+
+	if t[0] == '+' {
+		sign = float64(1.0)
+	} else {
+		sign = float64(-1.0)
+	}
+
+	t = t[1:]
+
+	xpos = strings.IndexByte(t, 'x')
+	caratpos = strings.IndexByte(t, '^')
+
+	// deg(t) = 0 or 1 (at least '^' is missing).
+	if caratpos == -1 {
+
+		// deg(t) = 0 ('^' and 'x' are missing).
+		if xpos == -1 {
+			if coef, err = strconv.ParseFloat(t, 64); err != nil {
+				log.Panicf("parseTerm: could not parse deg 0 term coefficient \"%s\" (%v).",
+					t, err)
+			}
+
+			return sign * coef, 0
+		}
+
+		// deg(t) = 1 (Only '^' is missing).
+		if t[:xpos] == "" {
+			coef = 1
+		} else if coef, err = strconv.ParseFloat(t[:xpos], 64); err != nil {
+			log.Panicf("parseTerm: could not parse deg 1 term coefficient \"%s\" (%v).",
+				t[:xpos], err)
+		}
+
+		return sign * coef, 1
+	}
+
+	// deg(t) > 1.
+	if deg, err = strconv.ParseInt(t[caratpos+1:], 10, 64); err != nil {
+		log.Panicf("parseTerm: could not parse exponent \"%s\" (%v).", t[caratpos+1:], err)
+	}
+
+	if t[:xpos] == "" {
+		coef = 1
+	} else if coef, err = strconv.ParseFloat(t[:xpos], 64); err != nil {
+		log.Panicf("parseTerm: could not parse deg %d term coefficient %s (%v).", deg, t, err)
+	}
+
+	return sign * coef, int(deg)
+}
+
+// NewPolyFromString returns a Poly represented in unordered standard form by the given string s.
+//
+// # Format:
+//   - Terms (without sign) have the form "cx^n", with c real and n natural (including 0).
+//   - Aside from the leading term, all terms must be prefixed (spaces ignored) by a "+" or a "-"
+//     denoting the sign of the term. The user may choose to omit the sign on the leading term,
+//     in which case it is assumed to be positive.
+//   - Terms do not need to be ordered, nor does the user have to include terms with coefficient
+//     zero.
+//   - The user may include multiple terms of the same degree.
+//
+// # Examples:
+//   - NewPolyFromString("5") represents p(x) = 5
+//   - NewPolyFromString("- 4 + 3x^2 - 2x") represents p(x) = 3x^2 - 2x - 4.
+//   - NewPolyFromString("5x^10 + 0x^9 - 6x + 3x^2 - 2x") represents p(x) = 5x^10 + 3x^2 - 8x.
+//
+// Panics on empty or invalid strings.
+func NewPolyFromString(s string) Poly {
+
+	if s == "" {
+		log.Panic("NewPolyFromString: empty string.")
+	}
+
+	// Manually insert implicit leading plus if the first non-whitespace
+	// char is not "+" or "-".
+	i := 0
+	for s[i] == ' ' && i < len(s) {
+		i++
+	}
+
+	if !plusOrMinus(rune(s[i])) {
+		s = "+" + s
+	}
+
+	coefs := []float64{}
+
+	var coef float64
+	var deg int
+	var termsb strings.Builder
+
+	for _, c := range s {
+		if c != ' ' {
+
+			if plusOrMinus(c) && termsb.Len() != 0 {
+
+				coef, deg = parseTerm(termsb.String())
+				coefs = expand(coefs, deg+1)
+				coefs[deg] += coef
+
+				termsb.Reset()
+			}
+
+			termsb.WriteRune(c)
+		}
+	}
+
+	coef, deg = parseTerm(termsb.String())
+	coefs = expand(coefs, deg+1)
+	coefs[deg] += coef
+
+	return newPolyNoReverse(coefs)
+}
+
+// NewZeroPoly returns the Poly p(x) = 0.
+func NewZeroPoly() Poly {
+	return Poly{
+		coef: []float64{0},
+		len:  1,
+		deg:  0,
+	}
+}
+
+// Coefficients returns the coefficients c of p as a float64 slice such that
+//
+//	p(x) = c[0]x^(n-1) + c[1]x^(n-2) + ... + c[n-2]x^1 + c[n-1]x^0,
+//
+// where n = len(c).
+func (p Poly) Coefficients() []float64 {
+
+	return reverse(p.coef)
+}
+
+// Degree returns the degree of p.
+func (p Poly) Degree() int {
+
+	return p.deg
+}
+
+// LeadingCoefficient returns the coefficient of the highest-degreed term in p.
+func (p Poly) LeadingCoefficient() float64 {
+
+	return p.coef[p.deg]
+}
+
+// LargestCoefficient returns the largest coefficient in p.
+func (p Poly) LargestCoefficient() float64 {
+
+	return max(p.coef)
+}
+
+// SmallestCoefficient returns the smallest coefficient in p.
+func (p Poly) SmallestCoefficient() float64 {
+
+	return min(p.coef)
+}
+
+// CoefficientWithDegree returns the coefficient of the term with degree n in p.
+func (p Poly) CoefficientWithDegree(n uint) float64 {
+
+	// Coefficients of terms with degrees larger than that of p are
+	// zero by definition.
+	if n > uint(p.deg) {
+		return 0.0
+	}
+
+	return p.coef[n]
+}
+
+// Equal returns true if the p is equal to q, else false.
+func (p Poly) Equal(q Poly) bool {
+
+	if p.deg != q.deg {
 		return false
 	}
 
-	for i := 0; i < rp1.NumCoeffs(); i++ {
-		if rp1.coeffs[i] != rp2.coeffs[i] {
+	for i := 0; i < p.len; i++ {
+		if !approxEqual(p.coef[i], q.coef[i]) {
 			return false
 		}
 	}
@@ -97,228 +268,262 @@ func (rp1 *RealPolynomial) Equal(rp2 *RealPolynomial) bool {
 	return true
 }
 
-// IsZero returns true if polynomial is equal to the zero polynomial. Otherwise, false is returned.
-func (rp *RealPolynomial) IsZero() bool {
-	return rp.Degree() == 0 && rp.coeffs[0] == 0.0
+// IsConstant returns true p is constant (i.e. deg(p) = 0), else false.
+func (p Poly) IsConstant() bool {
+
+	return p.deg == 0
 }
 
-// IsDegree returns true if polynomial is of degree n. Otherwise, false is returned.
-func (rp *RealPolynomial) IsDegree(n int) bool {
-	return rp.Degree() == n
+// IsZero returns true if p(x) = 0, else false.
+func (p Poly) IsZero() bool {
+
+	// Check if p is a constant and if that constant is 0.
+	return p.deg == 0 && approxEqual(p.coef[0], 0)
 }
 
-// CoeffAtDegree returns the coefficient of the polynomial at degree n.
-func (rp *RealPolynomial) CoeffAtDegree(n int) float64 {
-	if n < 0 {
-		panic("invalid degree")
+// IsMonic returns true p is monic (i.e. leading coefficient 1), else false.
+func (p Poly) IsMonic() bool {
+
+	return approxEqual(p.coef[p.deg], 1)
+}
+
+// At returns the value of p evaluated at x.
+func (p Poly) At(x float64) float64 {
+
+	// Implement Horner's scheme.
+	out := p.coef[p.deg]
+	for i := p.deg - 1; i >= 0; i-- {
+		out = out*x + p.coef[i]
 	}
-	return rp.coeffs[n]
+
+	return out
 }
 
-// Add adds the polynomial to rp2 and returns the sum.
-//
-// The current instance is also set to the sum.
-func (rp1 *RealPolynomial) Add(rp2 *RealPolynomial) *RealPolynomial {
-	var maxNumCoeffs int
+// Add returns the polynomial sum p + q.
+func (p Poly) Add(q Poly) Poly {
 
-	// Pad "shorter" polynomial with 0s.
-	if rp1.NumCoeffs() >= rp2.NumCoeffs() {
-		maxNumCoeffs = rp1.NumCoeffs()
-		for rp2.NumCoeffs() < maxNumCoeffs {
-			rp2.coeffs = append(rp2.coeffs, 0.0)
-		}
-
-	} else if rp1.NumCoeffs() < rp2.NumCoeffs() {
-		maxNumCoeffs = len(rp2.coeffs)
-		for rp1.NumCoeffs() < maxNumCoeffs {
-			rp1.coeffs = append(rp1.coeffs, 0.0)
-		}
+	var max int
+	if p.len > q.len {
+		max = p.len
 	} else {
-		maxNumCoeffs = len(rp1.coeffs)
+		max = q.len
 	}
 
-	// Add coefficients with matching degrees.
-	sumCoeffs := make([]float64, maxNumCoeffs)
+	// Pad the shorter polynomial with zeroes to align.
+	pe := expand(p.coef, max)
+	qe := expand(q.coef, max)
 
-	for i := 0; i < maxNumCoeffs; i++ {
-		sumCoeffs[i] = rp1.coeffs[i] + rp2.coeffs[i]
+	sumCoef := make([]float64, max)
+
+	// Add like terms.
+	for i := 0; i < max; i++ {
+		sumCoef[i] = pe[i] + qe[i]
 	}
 
-	rp1.coeffs = stripTailingZeroes(sumCoeffs)
-	rp2.coeffs = stripTailingZeroes(rp2.coeffs)
-	return rp1
+	return newPolyNoReverse(sumCoef)
 }
 
-// Sub subtracts rp2 from the polynomial and returns the difference.
-//
-// The current instance is also set to the difference.
-func (rp1 *RealPolynomial) Sub(rp2 *RealPolynomial) *RealPolynomial {
-	var maxNumCoeffs int
+// Sub returns the polynomial difference p - q.
+func (p Poly) Sub(q Poly) Poly {
 
-	// Pad "shorter" polynomial with 0s.
-	if rp1.NumCoeffs() > rp2.NumCoeffs() {
-		maxNumCoeffs = rp1.NumCoeffs()
-		for rp2.NumCoeffs() < maxNumCoeffs {
-			rp2.coeffs = append(rp2.coeffs, 0.0)
-		}
-
-	} else if rp1.NumCoeffs() < rp2.NumCoeffs() {
-		maxNumCoeffs = len(rp2.coeffs)
-		for rp1.NumCoeffs() < maxNumCoeffs {
-			rp1.coeffs = append(rp1.coeffs, 0.0)
-		}
+	var max int
+	if p.len > q.len {
+		max = p.len
 	} else {
-		maxNumCoeffs = len(rp1.coeffs)
+		max = q.len
 	}
 
-	// Subtract coefficients with matching degrees.
-	diffCoeffs := make([]float64, maxNumCoeffs)
+	pe := expand(p.coef, max)
+	qe := expand(q.coef, max)
 
-	for i := 0; i < maxNumCoeffs; i++ {
-		diffCoeffs[i] = rp1.coeffs[i] - rp2.coeffs[i]
+	difCoef := make([]float64, max)
+
+	for i := 0; i < max; i++ {
+		difCoef[i] = pe[i] - qe[i]
 	}
-	rp1.coeffs = stripTailingZeroes(diffCoeffs)
-	rp2.coeffs = stripTailingZeroes(rp2.coeffs)
-	return rp1
+
+	return newPolyNoReverse(difCoef)
 }
 
-// MulNaive multiplies the polynomial with rp2 and returns the product.
-//
-// The current instance is also set to the product.
-//
-// It is not recommended to use this function as it is generally slow. Use Mul() instead.
-func (rp1 *RealPolynomial) MulNaive(rp2 *RealPolynomial) *RealPolynomial {
-	prodCoeffs := make([]float64, rp1.Degree()+rp2.Degree()+1)
+// MulScalar returns the scalar-polynomial product sp.
+func (p Poly) MulScalar(s float64) Poly {
 
-	for i := 0; i < rp1.NumCoeffs(); i++ {
-		for j := 0; j < rp2.NumCoeffs(); j++ {
-			// We use += since we may visit the same index multiple times
-			prodCoeffs[i+j] += rp1.coeffs[i] * rp2.coeffs[j]
+	// 0 * p = 0.
+	if s == 0 {
+		return NewPoly([]float64{0})
+	}
+
+	prodCoef := make([]float64, p.len)
+	for i, c := range p.coef {
+		prodCoef[i] = s * c
+	}
+
+	return newPolyNoReverse(prodCoef)
+}
+
+// Mul returns the polynomial product pq.
+//
+// If speed is more important, use MulFast() instead (at the cost of accuracy).
+func (p Poly) Mul(q Poly) Poly {
+
+	// The product m will have deg(m) = deg(p) + deg(q).
+	// We add 1 since degree is one less than length of the coefficient slice.
+	prodCoef := make([]float64, p.deg+q.deg+1)
+
+	for i := 0; i < p.len; i++ {
+		for j := 0; j < q.len; j++ {
+			prodCoef[i+j] += p.coef[i] * q.coef[j]
 		}
 	}
 
-	rp1.coeffs = stripTailingZeroes(prodCoeffs)
-	return rp1
+	return newPolyNoReverse(prodCoef)
 }
 
-// Mul multiplies the polynomial with rp2 and returns the product.
+// MulFast returns the polynomial product pq.
 //
-// The current instance is also set to the product.
-func (rp1 *RealPolynomial) Mul(rp2 *RealPolynomial) *RealPolynomial {
-	lenRp1 := len(rp1.coeffs)
-	lenRp2 := len(rp2.coeffs)
-
-	padLen := nextClosestPowerOfTwo(lenRp1 + lenRp2 - 1)
-
-	coeffs1 := make([]float64, padLen)
-	coeffs2 := make([]float64, padLen)
-	copy(coeffs1, rp1.coeffs)
-	copy(coeffs2, rp2.coeffs)
-
-	// With the FFT, we can run in O(n log n) time.
-	fa := fastFourierTransform(complex128Slice(coeffs1))
-	fb := fastFourierTransform(complex128Slice(coeffs2))
-
-	fc := make([]complex128, padLen)
-	for i := 0; i < padLen; i++ {
-		fc[i] = fa[i] * fb[i]
-	}
-
-	tmpCoeffs := float64Slice(inverseFastFourierTransform(fc))
-
-	for i, c := range tmpCoeffs {
-		tmpCoeffs[i] = c / float64(padLen)
-	}
-
-	rp1.coeffs = stripTailingZeroes(tmpCoeffs[:rp1.Degree()+rp2.Degree()+1])
-	return rp1
-}
-
-// MulS multiplies the polynomial with a scalar and returns the product.
+// This method uses an FFT algorithm to perform fast polynomial multiplication at the price of
+// small floating point errors in O(n log n) time.
 //
-// The current instance is also set to the product.
-func (rp *RealPolynomial) MulS(s float64) *RealPolynomial {
-	for i := 0; i < len(rp.coeffs); i++ {
-		rp.coeffs[i] *= s
-	}
-	return rp
-}
-
-// EuclideanDiv divides the polynomial by rp2 and returns the result as a quotient-remainder pair.
+// Due to floating point errors in the FFT algorithm (which are especially noticable in large
+// coefficients), MulFast() should be used when equality checks are not rigorous and speed is a
+// requirement. If equality must be checked, the margin of error can be adjusted via SetEpsilon().
 //
-// The current instance is also set to the quotient.
-func (rp1 *RealPolynomial) EuclideanDiv(rp2 *RealPolynomial) (*RealPolynomial, *RealPolynomial) {
-	if rp1 == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
+// If full accuracy is more important, use Mul() instead (at the cost of speed).
+func (p Poly) MulFast(q Poly) Poly {
+	// Algorithm reference:
+	// https://faculty.sites.iastate.edu/jia/files/inline-files/polymultiply.pdf
+
+	if p.deg == 0 {
+		return q.MulScalar(p.coef[0])
 	}
 
-	if rp2.IsZero() {
-		panic("RealPolynomial division by zero")
+	if q.deg == 0 {
+		return p.MulScalar(q.coef[0])
 	}
 
-	// Using special properties of the ordered coefficient system, we can divide polynomials
-	// via shifts:
-	// https://rosettacode.org/wiki/Polynomial_long_division
-	quotCoeffs := make([]float64, rp1.Degree()-rp2.Degree()+1)
-	var d *RealPolynomial
-	var shift int
-	var factor float64
+	// Pad the length of the product coefficient slice to a power of 2 for an efficient FFT.
+	prodlen := p.deg + q.deg + 1
+	potlen := nextPOT(prodlen)
 
-	rem := *rp1
+	// Evaluation to point-value representation.
+	// Since len(a) and len(b) are powers of 2, the call to
+	// fft.FFT() implicitly calls the radix2FFT() function,
+	// which implements the radix-2 DIT Cooley-Tukey algorithm
+	// (with small floating point error).
+	a := fft.FFT(toComplex128(expand(p.coef, potlen)))
+	b := fft.FFT(toComplex128(expand(q.coef, potlen)))
 
-	for rem.Degree() >= rp2.Degree() {
-		shift = rem.Degree() - rp2.Degree()
-		d = rp2.ShiftRight(shift)
-		factor = rem.LeadCoeff() / d.LeadCoeff()
-		quotCoeffs[shift] = factor
-		d.MulS(factor)
-		rem.Sub(d)
+	// Pointwise multiplication.
+	c := make([]complex128, potlen)
+	for i := 0; i < potlen; i++ {
+		c[i] = a[i] * b[i]
 	}
 
-	rp1.coeffs = quotCoeffs
-	return rp1, &rem
+	// Interpolation to coefficient slice.
+	//
+	// We manually cut the slice off at the expected product length
+	// since floating point error may cause coefficients that are
+	// supposed to be zero to be nonzero. This trips up the call to
+	// removeTrailingZeroes within newPolyNoReverse and we end up
+	// with a polynomial product with nonexistent nonzero leading
+	// coefficeints of degree larger than the expected product (p.deg + q.deg).
+	return newPolyNoReverse(toFloat64(fft.IFFT(c))[:prodlen])
 }
 
-// Expr returns a string representation of the polynomial in increasing sum form.
-func (rp *RealPolynomial) String() string {
-	var expr string
-	for d, c := range rp.coeffs {
-		if d == len(rp.coeffs)-1 {
-			expr += fmt.Sprintf("%fx^%d", c, d)
-		} else {
-			expr += fmt.Sprintf("%fx^%d + ", c, d)
+// Div returns m (polynomial quotient) and n (polynomial remainder) such that p/q = m + n/q.
+//
+// Panics if q = 0.
+func (p Poly) Div(q Poly) (Poly, Poly) {
+
+	// Dividing by zero.
+	if q.IsZero() {
+		log.Panic("Div: division by zero polynomial.")
+	}
+
+	// Dividing zero.
+	if p.IsZero() {
+		return NewZeroPoly(), NewZeroPoly()
+	}
+
+	// Dividing by larger degree.
+	if p.deg < q.deg {
+		return NewZeroPoly(), p
+	}
+
+	// Implement expanded synthetic division for non-monic divisors.
+
+	pRev := reverse(p.coef)
+	qRev := reverse(q.coef)
+
+	quoRemCoef := make([]float64, p.len)
+	copy(quoRemCoef, pRev)
+
+	lead := qRev[0]
+	sep := p.len - q.len + 1
+
+	for i := 0; i < sep; i++ {
+		quoRemCoef[i] /= lead
+
+		if c := quoRemCoef[i]; c != 0 {
+
+			for j := 1; j < q.len; j++ {
+				quoRemCoef[i+j] += -qRev[j] * c
+			}
 		}
 	}
 
-	return expr
+	quoCoef := reverse(quoRemCoef[:sep])
+	remCoef := reverse(quoRemCoef[sep:])
+
+	return newPolyNoReverse(quoCoef), newPolyNoReverse(remCoef)
 }
 
-func (p Point) String() string {
-	return fmt.Sprintf("(%f, %f)", p.X, p.Y)
-}
+// Derivative returns the derivative p' of p.
+func (p Poly) Derivative() Poly {
 
-// PrintExpr prints the string expression of the current instance in increasing sum form to standard output.
-func (rp *RealPolynomial) Print() {
-	fmt.Println(rp)
-}
-
-// NewRealPolynomial returns a new *RealPolynomial instance with the given coeffs.
-func NewRealPolynomial(coeffs []float64) (*RealPolynomial, error) {
-	if len(coeffs) == 0 {
-		return nil, errors.New("cannot create polynomial with no coefficients")
+	// p is a constant, whose derivative is always 0.
+	if p.deg == 0 {
+		return NewPoly([]float64{0})
 	}
 
-	var newPolynomial RealPolynomial
-	newPolynomial.coeffs = stripTailingZeroes(coeffs)
+	// For nonconstant p, if deg(p) = n, then deg(p') = n - 1.
+	derivCoef := make([]float64, p.deg)
+	for i := 0; i < p.deg; i++ {
+		derivCoef[i] = p.coef[i+1] * float64(i+1)
+	}
 
-	return &newPolynomial, nil
+	return newPolyNoReverse(derivCoef)
 }
 
-// SetNewtonIterations sets the number of iterations used in Newton's Method implmentation in root solving functions.
-func SetNewtonIterations(n int) error {
-	if n < 0 {
-		return errors.New("cannot set negative iterations for Newton's Method")
+// Reciprocal returns the reciprocal p* of p.
+func (p Poly) Reciprocal() Poly {
+
+	// Since we reverse the user's coefficient slice in NewPoly(), we just pass
+	// it back into NewPoly() to reverse the coefficient slice again.
+
+	return NewPoly(p.coef)
+}
+
+// String returns a string representation of p in sum form.
+//
+// Terms are rounded to the default 6 decimal places.
+//
+// Terms with coefficients equal to zero are shown in the string for alignment purposes.
+func (p Poly) String() string {
+
+	var sb strings.Builder
+	sb.WriteString("[ ")
+
+	for i := 0; i < p.deg-1; i++ {
+		sb.WriteString(fmt.Sprintf("%.3fx^%d + ", p.coef[p.deg-i], p.deg-i))
 	}
-	globalNewtonIterations = n
-	return nil
+
+	// Last two special case terms (ax^1 + bx^0 = ax + b).
+	if p.len >= 2 {
+		sb.WriteString(fmt.Sprintf("%.3fx + ", p.coef[1]))
+	}
+
+	sb.WriteString(fmt.Sprintf("%.3f ]", p.coef[0]))
+
+	return sb.String()
 }
