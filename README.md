@@ -37,5 +37,9 @@ go get github.com/SeanJxie/polygo@main
 	- Work in progress.
 
 ## Documentation
+
+The current docs are outdated. They will be updated when the current rewrite is complete and
+a version can be tagged.
+
 Godoc: https://pkg.go.dev/github.com/seanjxie/polygo
 
