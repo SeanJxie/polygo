@@ -244,6 +244,13 @@ func Test_NewPolyFromString(t *testing.T) {
 			wantDeg:   0,
 		},
 		{
+			name:      "constants",
+			arg:       "   1+2+3+4+5+6-2.15-2     ",
+			wantCoefs: []float64{16.85},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
 			name:      "linear pos leading",
 			arg:       "   x +4    ",
 			wantCoefs: []float64{4, 1},
@@ -954,6 +961,44 @@ func Test_PolyReciprocal(t *testing.T) {
 	}
 }
 
+func Test_PolyCauchyBoundPanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewZeroPoly().CauchyBound() })
+	assert.Panics(t, func() { NewPoly([]float64{3.14}).CauchyBound() })
+}
+
+func Test_PolyCauchyBound(t *testing.T) {
+	testCases := []struct {
+		name string
+		arg  Poly
+		want float64
+	}{
+		{
+			name: "linear",
+			arg:  NewPoly([]float64{125124, 1.1715}),
+			want: 1.0000093627121895,
+		},
+		{
+			name: "quadratic",
+			arg:  NewPoly([]float64{1, -1, 0}),
+			want: 2,
+		},
+		{
+			name: "wilkinson",
+			arg:  NewPolyWilkinson(),
+			want: 1.3803759753640704e19,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.arg.CauchyBound()
+
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func Test_PolyString(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -963,37 +1008,37 @@ func Test_PolyString(t *testing.T) {
 		{
 			name: "zero",
 			arg:  NewZeroPoly(),
-			want: "[ 0.000 ]",
+			want: "[ 0.00000x^0 ]",
 		},
 		{
 			name: "negative const",
 			arg:  NewPoly([]float64{-21}),
-			want: "[ -21.000 ]",
+			want: "[ -21.00000x^0 ]",
 		},
 		{
 			name: "nonzero const",
 			arg:  NewPoly([]float64{3.1415}),
-			want: "[ 3.142 ]",
+			want: "[ 3.14150x^0 ]",
 		},
 		{
 			name: "linear",
 			arg:  NewPoly([]float64{125124, 1.1715}),
-			want: "[ 125124.000x + 1.171 ]",
+			want: "[ 125124.00000x^1 + 1.17150x^0 ]",
 		},
 		{
 			name: "quadratic",
 			arg:  NewPoly([]float64{47346346, 734334, 2342366}),
-			want: "[ 47346346.000x^2 + 734334.000x + 2342366.000 ]",
+			want: "[ 47346346.00000x^2 + 734334.00000x^1 + 2342366.00000x^0 ]",
 		},
 		{
 			name: "cubic",
 			arg:  NewPoly([]float64{2152, 47346346, 734334, 2342366}),
-			want: "[ 2152.000x^3 + 47346346.000x^2 + 734334.000x + 2342366.000 ]",
+			want: "[ 2152.00000x^3 + 47346346.00000x^2 + 734334.00000x^1 + 2342366.00000x^0 ]",
 		},
 		{
 			name: "cubic with negative",
 			arg:  NewPoly([]float64{-2152, 47346346, -734334, 2342366}),
-			want: "[ -2152.000x^3 + 47346346.000x^2 + -734334.000x + 2342366.000 ]",
+			want: "[ -2152.00000x^3 + 47346346.00000x^2 - 734334.00000x^1 + 2342366.00000x^0 ]",
 		},
 	}
 
@@ -1002,6 +1047,48 @@ func Test_PolyString(t *testing.T) {
 			got := tc.arg.String()
 
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func Test_Poly_id(t *testing.T) {
+	testCases := []struct {
+		name string
+		arg  Poly
+	}{
+		{
+			name: "zero",
+			arg:  NewZeroPoly(),
+		},
+		{
+			name: "negative const",
+			arg:  NewPoly([]float64{-21}),
+		},
+		{
+			name: "nonzero const",
+			arg:  NewPoly([]float64{3.1415}),
+		},
+		{
+			name: "linear",
+			arg:  NewPoly([]float64{125124, 1.1715}),
+		},
+		{
+			name: "quadratic",
+			arg:  NewPoly([]float64{47346346, 734334, 2342366}),
+		},
+		{
+			name: "cubic",
+			arg:  NewPoly([]float64{2152, 47346346, 734334, 2342366}),
+		},
+		{
+			name: "cubic with negative",
+			arg:  NewPoly([]float64{-2152, 47346346, -734334, 2342366}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.arg.id()
 		})
 	}
 }

@@ -364,7 +364,7 @@ func Test_max(t *testing.T) {
 			want: 1,
 		},
 		{
-			name: "mutliple",
+			name: "multiple",
 			arg:  []float64{-4, -3, -2, -1, 0, 1, 2, 3, 4},
 			want: 4,
 		},
@@ -395,7 +395,7 @@ func Test_min(t *testing.T) {
 			want: 1,
 		},
 		{
-			name: "mutliple",
+			name: "multiple",
 			arg:  []float64{-4, -3, -2, -1, 0, 1, 2, 3, 4},
 			want: -4,
 		},

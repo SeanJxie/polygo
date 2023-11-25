@@ -1,11 +1,16 @@
 # polygo
 A polynomial library written in Go.
-
+```
+go get github.com/SeanJxie/polygo
+```
 ## Features
-- Methods of initialization:
+- Initialization methods:
 	- From a slice of coefficients
-	- Parse from string
-	- Zero polynomial
+	- From a string
+	- Special polynomials:
+		- Zero polynomial
+		- Wilkinson's polynomial
+
 
 - Binary operations:
 	- Addition
@@ -22,17 +27,14 @@ A polynomial library written in Go.
 	- Degree
 	- Reciprocal 
 	- Boolean checks (constant, zero, monic, etc.)
+	- Cauchy's root bound
 
-- Solvers:
-	- Work in progress.
+- Solver:
+	- Solve polynomial equations (i.e. roots, intersections).
+	- Various algorithms to count, isolate, and find roots.
 
 - Grapher:
 	- Work in progress.
-
-## Installation
-```
-go get -u github.com/SeanJxie/polygo
-```
 
 ## Documentation
 Godoc: https://pkg.go.dev/github.com/seanjxie/polygo

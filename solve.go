@@ -1,249 +1,386 @@
 package polygo
 
-/*
-This file contains polynomial solvers and related algorithms.
-*/
-
 import (
-	"errors"
+	"log"
+	"math/rand"
 )
 
-// CountRootsWithin returns the number of roots of the current instance on the closed interval [a, b].
-// If there are an infinite amount of roots, -1 is returned.
-func (rp *RealPolynomial) CountRootsWithin(a, b float64) int {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
+type CountAlgorithm int
+type IsolateAlgorithm int
+type SearchAlgorithm int
+
+const (
+	// ALG_COUNT represents the algorithm used for counting the number of roots on a half-open
+	// interval (a, b].
+	ALG_COUNT_STURM CountAlgorithm = iota
+
+	// ALG_ISOLATE represents the algorithm used for isolating single roots to a sequence of
+	// non-overlapping half-open intervals with form (a, b].
+	ALG_ISOLATE_BISECT IsolateAlgorithm = iota
+
+	// ALG_SEARCH represents the algorithm used for finding a single root on a half-open interval
+	// (a, b].
+	ALG_SEARCH_NEWTON SearchAlgorithm = iota
+	ALG_SEARCH_BISECT
+)
+
+var (
+	newtonIterations = 100
+	bisectPrecision  = epsilon
+)
+
+func (a CountAlgorithm) String() string {
+	switch a {
+	case ALG_COUNT_STURM:
+		return "ALG_COUNT_STURM"
 	}
+	return "ALG_COUNT_UNKNOWN"
+}
+
+func (a IsolateAlgorithm) String() string {
+	switch a {
+	case ALG_ISOLATE_BISECT:
+		return "ALG_ISOLATE_BISECT"
+	}
+	return "ALG_ISOLATE_UNKNOWN"
+}
+
+func (a SearchAlgorithm) String() string {
+	switch a {
+	case ALG_SEARCH_NEWTON:
+		return "ALG_SEARCH_NEWTON"
+	case ALG_SEARCH_BISECT:
+		return "ALG_SEARCH_BISECT"
+	}
+	return "ALG_SEARCH_UNKNOWN"
+}
+
+// sturmChain represents the Sturm chain (or sequence) of a Poly.
+type sturmChain struct {
+	c   []Poly
+	len int
+}
+
+// computeSturmChain computes and caches the Sturm chain of p.
+func new_sturmChain(p Poly) sturmChain {
+
+	// Constant case.
+	if p.deg == 0 {
+		return sturmChain{[]Poly{p}, 1}
+	}
+
+	// Construct Sturm chain.
+	chain := make([]Poly, p.deg+1)
+	chain[0], chain[1] = p, p.Derivative()
+
+	i := 1
+	var rem Poly
+
+	for !chain[i].IsConstant() {
+		_, rem = chain[i-1].Div(chain[i])
+		chain[i+1] = rem.MulScalar(-1)
+		i++
+	}
+
+	// Resize.
+	i++
+	chain = chain[:i]
+
+	return sturmChain{
+		c:   chain,
+		len: i,
+	}
+}
+
+// count returns the number of roots on the half-open interval (a, b] for p associated with s.
+//
+// Panics for invalid intervals.
+func (s sturmChain) count(a, b float64) int {
 
 	if a > b {
-		panic("invalid interval")
+		log.Panicf("count: invalid interval (%f, %f].", a, b)
 	}
 
-	if rp.Degree() == 0 && rp.coeffs[0] == 0.0 {
-		return -1
+	if s.len == 1 {
+		return 0 // No sign changes in one value.
 	}
 
-	return rp.countRootsWithinWSC(a, b, rp.sturmChain())
+	chain := s.c
 
+	prevsa := sign(chain[0].At(a))
+	prevsb := sign(chain[0].At(b))
+	var currsa, currsb int
+
+	// Sign change counters.
+	va := 0
+	vb := 0
+
+	for i := 1; i < s.len; i++ {
+		currsa = sign(chain[i].At(a))
+		currsb = sign(chain[i].At(b))
+
+		if currsa != prevsa && prevsa != 0 {
+			va++
+		}
+
+		if currsb != prevsb && prevsb != 0 {
+			vb++
+		}
+
+		prevsa = currsa
+		prevsb = currsb
+	}
+
+	// Hacky fix for when a, b are multiple roots of p.
+	if va-vb < 0 {
+		return 0
+	}
+
+	return va - vb
 }
 
-// FindRootWithin returns ANY root of the current instance existing on the closed interval [a, b].
-// If there are no roots on the provided interval, an error is set.
-func (rp *RealPolynomial) FindRootWithin(a, b float64) (float64, error) {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
-
-	if a > b {
-		panic("invalid interval")
-	}
-
-	// Since findRootsWithinAcc operates on the half-open interval (a, b], manually check if a is a root.
-	if rp.At(a) == 0.0 {
-		return a, nil
-	}
-
-	sturmChain := rp.sturmChain()
-	nRootsWithin := rp.countRootsWithinWSC(a, b, sturmChain)
-
-	if nRootsWithin == 0 {
-		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
-	}
-
-	if nRootsWithin < 0 { // Infinite amount of roots
-		return 0.0, nil
-	}
-
-	return rp.findRootWithinWSC(a, b, sturmChain)
+// HalfOpenInterval represents a half-open interval (L, R].
+type HalfOpenInterval struct {
+	L, R float64
 }
 
-// FindRootsWithin returns ALL roots of the current instance existing on the closed interval [a, b].
-// Unlike FindRootWithin, no error is set if there are no solutions on the provided interval. Instead, an empty slice is returned.
-// If there are an infinite number of solutions on [a, b], an error is set.
-func (rp *RealPolynomial) FindRootsWithin(a, b float64) ([]float64, error) {
-	if rp == nil {
-		panic("received nil *RealPolynomial")
-	}
+// Solver represents a collection of methods used to solve polynomial equations.
+type Solver struct {
+	counter  CountAlgorithm
+	isolator IsolateAlgorithm
+	searcher SearchAlgorithm
 
-	// The only polynomial with infinitely many roots is P(x) = 0
-	// https://math.stackexchange.com/questions/1137190/is-there-a-polynomial-that-has-infinitely-many-roots
-	if rp.IsZero() {
-		return nil, errors.New("infinitely many solutions")
-	}
-
-	// Since findRootsWithinAcc operates on the half-open interval (a, b], manually check if a is a root.
-	if rp.At(a) == 0.0 {
-		return append(rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), a), nil
-	}
-	return rp.findRootsWithinAcc(a, b, nil, rp.sturmChain()), nil
+	// Optional attributes (depends on algorithms used).
+	chainCache map[uint32]sturmChain
 }
 
-// findRootsWithinAcc is an accumulative implmentation of a hybrid Bisection Method through recursion.
-// Wrapped by FindRootsWithin.
-func (rp *RealPolynomial) findRootsWithinAcc(a, b float64, roots []float64, chain []*RealPolynomial) []float64 {
-	nRoots := rp.countRootsWithinWSC(a, b, chain)
-	if nRoots > 1 {
-		mp := (a + b) / 2.0
-		return append(
-			rp.findRootsWithinAcc(a, mp, roots, chain),
-			rp.findRootsWithinAcc(mp, b, roots, chain)...,
-		)
+// NewSolver returns a Solver equipped with the given root counting, isolation, and searching
+// algorithms.
+func NewSolver(counter CountAlgorithm, isolator IsolateAlgorithm, searcher SearchAlgorithm) Solver {
 
-	} else if nRoots == 1 {
-		root, _ := rp.findRootWithinWSC(a, b, chain)
-		roots = append(roots, root)
+	return Solver{
+		counter:    counter,
+		isolator:   isolator,
+		searcher:   searcher,
+		chainCache: make(map[uint32]sturmChain),
+	}
+}
+
+// NewSolverDefault returns a default solver.
+//
+// Specifically, the defaults are:
+//   - Root counting algorithm:  ALG_COUNT_STURM
+//   - Root isolation algorithm: ALG_ISOLATE_BISECT
+//   - Root search algorithm:    ALG_SEARCH_BISECT
+func NewSolverDefault() Solver {
+
+	return NewSolver(ALG_COUNT_STURM, ALG_ISOLATE_BISECT, ALG_SEARCH_BISECT)
+}
+
+func (s Solver) cacheSturmChain(p Poly) sturmChain {
+
+	id := p.id()
+	cache := s.chainCache
+
+	for key := range cache {
+		if id == key {
+			return cache[id]
+		}
+	}
+
+	// Sturm chain has not been cached.
+	cache[id] = new_sturmChain(p)
+
+	return cache[id]
+}
+
+func (s Solver) CountRootsWithin(p Poly, a, b float64) int {
+
+	var ret int
+
+	switch s.counter {
+
+	case ALG_COUNT_STURM:
+		ret = s.cacheSturmChain(p).count(a, b)
+	}
+
+	return ret
+}
+
+// IsolateRoots returns a partition of the half-open interval (a, b] such that each half-open
+// subinterval of the partition contains exactly one root of p.
+func (s Solver) IsolateRootsWithin(p Poly, a, b float64) []HalfOpenInterval {
+
+	partition := []HalfOpenInterval{}
+
+	switch s.isolator {
+
+	case ALG_ISOLATE_BISECT:
+
+		c := s.CountRootsWithin(p, a, b)
+
+		if c == 0 {
+			return []HalfOpenInterval{}
+		}
+
+		if c == 1 {
+			return []HalfOpenInterval{{a, b}}
+		}
+
+		m := 0.5 * (a + b)
+
+		partition = append(s.IsolateRootsWithin(p, a, m), s.IsolateRootsWithin(p, m, b)...)
+	}
+
+	return partition
+}
+
+// FindRootsWithin returns the distinct roots of p on the half-open interval (a, b].
+//
+// Panics for invalid intervals.
+func (s Solver) FindRootsWithin(p Poly, a, b float64) []float64 {
+
+	if b < a {
+		log.Panicf("FindRootsWithin: invalid interval (%f, %f].", a, b)
+	}
+
+	roots := []float64{}
+
+	// For deg(p) = 0, 1, 2, just solve exactly.
+	if p.deg == 0 {
+
+	}
+
+	intervals := s.IsolateRootsWithin(p, a, b)
+
+	switch s.searcher {
+
+	case ALG_SEARCH_NEWTON:
+
+		// Implement Newton-Raphson with random guess sampling.
+
+		fprime := p.Derivative()
+
+		var root, fprimeroot, left, right float64
+
+		for _, h := range intervals {
+
+			left, right = h.L, h.R
+
+		random_sample_newton:
+
+			// Random sample on interval.
+			root = left + rand.Float64()*(right-left)
+
+			for i := 0; i < newtonIterations; i++ {
+				fprimeroot = fprime.At(root)
+
+				if fprimeroot == 0 {
+					break
+				}
+
+				root -= p.At(root) / fprimeroot
+			}
+
+			// Excluding root found outside of interval.
+			if !(left < root && root <= right) {
+				goto random_sample_newton
+			}
+
+			roots = append(roots, root)
+		}
+
+	case ALG_SEARCH_BISECT:
+
+		var left, right, mid float64
+
+		for _, h := range intervals {
+			left, right = h.L, h.R
+
+			for right-left > bisectPrecision {
+				mid = 0.5 * (left + right)
+
+				if s.CountRootsWithin(p, left, mid) == 1 {
+					right = mid
+				} else {
+					// If the root doesn't lie on the left-mid side, then it must lie on the
+					// mid-right side.
+					left = mid
+				}
+			}
+
+			roots = append(roots, mid)
+		}
 	}
 
 	return roots
 }
 
-// FindIntersectionWithin returns ANY intersection point of the current instance and rp2 existing on the closed interval [a, b].
-// If there are no intersections on the provided interval, an error is set.
-func (rp *RealPolynomial) FindIntersectionWithin(a, b float64, rp2 *RealPolynomial) (Point, error) {
-	tmp := *rp
+// FindRoots returns all distinct roots of p.
+func (s Solver) FindRoots(p Poly) []float64 {
 
-	root, err := (&tmp).Sub(rp2).FindRootWithin(a, b)
-	if err != nil {
-		return Point{}, err
-	}
-
-	point := Point{root, rp.At(root)}
-	return point, nil
+	bound := p.CauchyBound()
+	return s.FindRootsWithin(p, -bound, bound)
 }
 
-// FindIntersectionsWithin returns ALL intersection point of the current instance and rp2 existing on the closed interval [a, b].
-// Unlike FindIntersectionWithin, no error is set if there are no intersections on the provided interval. Instead, an empty slice is returned.
-// If there are an infinite number or solutions, an error is set.
-func (rp *RealPolynomial) FindIntersectionsWithin(a, b float64, rp2 *RealPolynomial) ([]Point, error) {
-	if rp == nil || rp2 == nil {
-		panic("received nil *RealPolynomial")
-	}
-
-	tmp := *rp
-	roots, err := tmp.Sub(rp2).FindRootsWithin(a, b)
-	if err != nil {
-		return nil, err
-	}
-
-	points := make([]Point, len(roots))
-
-	for i, x := range roots {
-		points[i] = Point{x, rp.At(x)}
-	}
-
-	return points, nil
+// Point represents a 2D Cartesian coordinate.
+type Point struct {
+	X, Y float64
 }
 
-/*
+// FindIntersectionsWithin returns the intersections of p and q on the half-open interval (a, b].
+//
+// Panics for invalid intervals.
+func (s Solver) FindIntersectionsWithin(p, q Poly, a, b float64) []Point {
 
-Since a non-changing Sturm Chain is used repetitevly through multiple functions, the following private functions
-with suffix "WSC" are such that the overhead caused by recomputing the Sturm chain every use is avoided by making the chain an input.
-
-*/
-
-func (rp *RealPolynomial) findRootWithinWSC(a, b float64, chain []*RealPolynomial) (float64, error) {
-	nRootsWithin := rp.countRootsWithinWSC(a, b, chain)
-	abMid := (a + b) / 2.0
-
-	if nRootsWithin == 0 {
-		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
+	if b < a {
+		log.Panicf("FindIntersectionsWithin: invalid interval (%f, %f].", a, b)
 	}
 
-	if nRootsWithin == -1 { // Infinite amount of roots
-		return 0.0, nil
+	xinter := s.FindRootsWithin(p.Sub(q), a, b)
+	points := make([]Point, len(xinter))
+
+	for i, x := range xinter {
+		points[i] = Point{X: x, Y: p.At(x)}
 	}
 
-	// Implement Newton's Method
-	deriv := rp.Derivative()
-	guess := abMid
-	var derivAtGuess float64
-	for i := 0; i < globalNewtonIterations; i++ {
-		derivAtGuess = deriv.At(guess)
-		// In the case that the derivative evaluates to zero, return the current guess.
-		if derivAtGuess == 0.0 {
-			return guess, nil
-		}
-		guess -= rp.At(guess) / derivAtGuess
-	}
-
-	// Operate on a half-open interval.
-	if guess == a {
-		return 0.0, errors.New("the polynomial has no solutions in the provided interval")
-	}
-
-	// Recall that Newton's method does not operate on an interval.
-	// In the case that we've found a solution outside of the given interval, bisect the interval and try on each half.
-	if !(a < guess && guess <= b) {
-		retryLeft, err1 := rp.findRootWithinWSC(a, abMid, chain)
-		retryRight, err2 := rp.findRootWithinWSC(abMid, b, chain)
-		if err1 == nil {
-			return retryLeft, nil
-		} else if err2 == nil {
-			return retryRight, nil
-		}
-	}
-	return guess, nil
+	return points
 }
 
-func (rp *RealPolynomial) countRootsWithinWSC(a, b float64, chain []*RealPolynomial) int {
-	// Generate sequence A and B to count sign variations
-	var seqA, seqB []float64
+// FindIntersections returns all intersections of p and q.
+func (s Solver) FindIntersections(p, q Poly) []Point {
 
-	for _, p := range chain {
-		seqA = append(seqA, p.At(a))
-		seqB = append(seqB, p.At(b))
+	xinter := s.FindRoots(p.Sub(q))
+
+	points := make([]Point, len(xinter))
+
+	for i, x := range xinter {
+		points[i] = Point{X: x, Y: p.At(x)}
 	}
 
-	return countSignVariations(seqA) - countSignVariations(seqB)
+	return points
 }
 
-func (rp *RealPolynomial) sturmChain() []*RealPolynomial {
-	// Implement Sturm's Theorem
-
-	var sturmChain []*RealPolynomial
-	var rem *RealPolynomial
-	var tmp RealPolynomial
-	sturmChain = append(sturmChain, rp)
-
-	deriv := rp.Derivative()
-	sturmChain = append(sturmChain, deriv)
-
-	for i := 1; i < rp.Degree(); i++ {
-		if sturmChain[i].Degree() == 0 {
-			break
-		}
-
-		tmp = *sturmChain[i-1]
-		_, rem = tmp.EuclideanDiv(sturmChain[i])
-		sturmChain = append(sturmChain, rem.MulS(-1))
+// SetNewtonSearchIterations sets the Newton's method root search algorithm iterations to v.
+//
+// Panics for negative v.
+func SetNewtonSearchIterations(v int) {
+	if v < 0 {
+		log.Panic("SetNewtonSearchIterations: negative v.")
 	}
 
-	return sturmChain
+	newtonIterations = v
 }
 
-// Counts sign variations in s: https://en.wikipedia.org/wiki/Budan%27s_theorem#Sign_variation
-func countSignVariations(s []float64) int {
-	// Filter zeroes in s.
-	var filtered []float64
-	for i := 0; i < len(s); i++ {
-		if s[i] != 0.0 {
-			filtered = append(filtered, s[i])
-		}
+// SetBisectSearchPrecision sets the bisect root search algorithm precision to v.
+//
+// The closer ot zero v is, the more accurate the roots.
+//
+// Panics for negative v.
+func SetBisectSearchPrecision(v float64) {
+	if v < 0 {
+		log.Panic("SetBisectSearchPrecision: negative v.")
 	}
 
-	// Count sign changes.
-	var count int
-	for i := 0; i < len(filtered)-1; i++ {
-		if filtered[i]*filtered[i+1] < 0 {
-			count++
-		}
-	}
-
-	return count
+	bisectPrecision = v
 }
-
-/*
-
-End "WSC"-suffixed (and related) functions.
-
-*/

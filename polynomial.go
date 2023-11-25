@@ -2,7 +2,9 @@ package polygo
 
 import (
 	"fmt"
+	"hash/fnv"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 
@@ -52,11 +54,13 @@ func NewPoly(coefficients []float64) Poly {
 	coefficients = removeTrailingZeroes(reverse(coefficients))
 	coefLen := len(coefficients)
 
-	return Poly{
+	ret := Poly{
 		coef: coefficients,
 		len:  coefLen,
 		deg:  coefLen - 1,
 	}
+
+	return ret
 }
 
 // newPolyNoReverse is just NewPoly but with no coefficient slice reversal.
@@ -71,11 +75,13 @@ func newPolyNoReverse(coefficients []float64) Poly {
 	coefficients = removeTrailingZeroes(coefficients)
 	coefLen := len(coefficients)
 
-	return Poly{
+	ret := Poly{
 		coef: coefficients,
 		len:  coefLen,
 		deg:  coefLen - 1,
 	}
+
+	return ret
 }
 
 // parseTerm returns the coefficient and exponent of a term in string form "(+|-)cx^n".
@@ -199,11 +205,36 @@ func NewPolyFromString(s string) Poly {
 
 // NewZeroPoly returns the Poly p(x) = 0.
 func NewZeroPoly() Poly {
-	return Poly{
-		coef: []float64{0},
-		len:  1,
-		deg:  0,
-	}
+
+	return newPolyNoReverse([]float64{0})
+}
+
+// NewPolyWilkinson returns Wilkinson's polynomial.
+func NewPolyWilkinson() Poly {
+
+	return NewPoly([]float64{
+		1,
+		-210,
+		20615,
+		-1256850,
+		53327946,
+		-1672280820,
+		40171771630,
+		-756111184500,
+		11310276995381,
+		-135585182899530,
+		1307535010540395,
+		-10142299865511450,
+		63030812099294896,
+		-311333643161390640,
+		1206647803780373360,
+		-3599979517947607200,
+		8037811822645051776,
+		-12870931245150988800,
+		13803759753640704000,
+		-8752948036761600000,
+		2432902008176640000},
+	)
 }
 
 // Coefficients returns the coefficients c of p as a float64 slice such that
@@ -384,7 +415,7 @@ func (p Poly) Mul(q Poly) Poly {
 // This method uses an FFT algorithm to perform fast polynomial multiplication at the price of
 // small floating point errors in O(n log n) time.
 //
-// Due to floating point errors in the FFT algorithm (which are especially noticable in large
+// Due to floating point errors in the FFT algorithm (which are especially noticeable in large
 // coefficients), MulFast() should be used when equality checks are not rigorous and speed is a
 // requirement. If equality must be checked, the margin of error can be adjusted via SetEpsilon().
 //
@@ -504,26 +535,78 @@ func (p Poly) Reciprocal() Poly {
 	return NewPoly(p.coef)
 }
 
-// String returns a string representation of p in sum form.
+// CauchyBound returns Cauchy's root bound of p.
 //
-// Terms are rounded to the default 6 decimal places.
+// If p(x) = 0, then |x| <= p.CauchyBound().
+//
+// Panics for constant p.
+func (p Poly) CauchyBound() float64 {
+
+	if p.deg == 0 {
+		panic("CauchyBound: constant polynomial.")
+	}
+
+	// Compute Cauchy's bound.
+
+	leadrecip := 1 / p.coef[p.deg]
+	maxi := math.Abs(p.coef[0] * leadrecip)
+	var tmp float64
+
+	for i := 1; i < p.deg; i++ {
+		tmp = math.Abs(p.coef[i] * leadrecip)
+
+		if tmp > maxi {
+			maxi = tmp
+		}
+	}
+
+	return 1 + maxi
+}
+
+// String returns a string representation of p in decreasing-degree sum form.
+//
+// Terms are rounded to 5 decimal places.
 //
 // Terms with coefficients equal to zero are shown in the string for alignment purposes.
 func (p Poly) String() string {
 
 	var sb strings.Builder
-	sb.WriteString("[ ")
 
-	for i := 0; i < p.deg-1; i++ {
-		sb.WriteString(fmt.Sprintf("%.3fx^%d + ", p.coef[p.deg-i], p.deg-i))
+	sb.WriteString(fmt.Sprintf("[ %.5fx^%d", p.coef[p.deg], p.deg))
+
+	var sgn, sgnlessCoef string
+	for i := 1; i < p.len; i++ {
+
+		if sign(p.coef[p.deg-i]) == -1 {
+			sgn = " - "
+			sgnlessCoef = fmt.Sprintf("%.5f", p.coef[p.deg-i])[1:]
+		} else {
+			sgn = " + "
+			sgnlessCoef = fmt.Sprintf("%.5f", p.coef[p.deg-i])
+		}
+
+		sb.WriteString(sgn)
+		sb.WriteString(fmt.Sprintf("%sx^%d", sgnlessCoef, p.deg-i))
 	}
 
-	// Last two special case terms (ax^1 + bx^0 = ax + b).
-	if p.len >= 2 {
-		sb.WriteString(fmt.Sprintf("%.3fx + ", p.coef[1]))
-	}
-
-	sb.WriteString(fmt.Sprintf("%.3f ]", p.coef[0]))
+	sb.WriteString(" ]")
 
 	return sb.String()
+}
+
+// id returns a unqiue identifier for p.
+func (p Poly) id() uint32 {
+
+	// Generate unqiue string and hash.
+
+	var sb strings.Builder
+
+	for _, c := range p.coef {
+		sb.WriteString(fmt.Sprintf("%f,", c))
+	}
+
+	h := fnv.New32()
+	h.Write([]byte(sb.String()))
+
+	return h.Sum32()
 }

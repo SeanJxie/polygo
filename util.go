@@ -146,10 +146,10 @@ func approxEqual(a, b float64) bool {
 		return true
 	}
 
-	// For a visualization of the error check: https://www.desmos.com/calculator/b75lmu3wd6.
+	// For a visualization of the error check: https://www.desmos.com/calculator/8bfr35y3k5.
 
 	absErr := math.Abs(a - b)
-	relErr := math.Abs(a-b) / (math.Abs(a) + math.Abs(b))
+	relErr := absErr / math.Abs(a+b)
 
 	return absErr <= epsilon || relErr <= epsilon
 }
