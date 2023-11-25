@@ -1,7 +1,7 @@
 # polygo
 A polynomial library written in Go.
 ```
-go get github.com/SeanJxie/polygo
+go get github.com/SeanJxie/polygo@main
 ```
 ## Features
 - Initialization methods:
