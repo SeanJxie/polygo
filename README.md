@@ -1,16 +1,23 @@
-# polygo
+# Polygo
+
 A polynomial library written in Go.
 ```
 go get github.com/SeanJxie/polygo@main
 ```
 ## Features
+
+Note: Polygo is being currently being rewritten. The following features are expected to expand.
+
 - Initialization methods:
 	- From a slice of coefficients
-	- From a string
+	- Parsed from a string
 	- Special polynomials:
-		- Zero polynomial
-		- Wilkinson's polynomial
-
+		- Zero
+		- Constant
+		- Linear, Quadratic, Cubic
+		- Factored form
+		- Taylor (trigonometric, exp)
+		- Wilkinson's
 
 - Binary operations:
 	- Addition
@@ -18,23 +25,25 @@ go get github.com/SeanJxie/polygo@main
 	- Scalar multiplication
 	- Multiplication (with fast variant using an FFT)
 	- Euclidean division
-	- Equality (based on absolute and relative error)
+	- Equality
 
 - Unary operations/properties:
 	- Evaluation (using Horner's scheme)
-	- Derivative
 	- Coefficients (leading, largest, n-th degree, etc.)
 	- Degree
 	- Reciprocal 
 	- Boolean checks (constant, zero, monic, etc.)
 	- Cauchy's root bound
 
-- Solver:
-	- Solve polynomial equations (i.e. roots, intersections).
-	- Various algorithms to count, isolate, and find roots.
+- Calculus:
+	- Derivative
+
+- Solver (mildly unstable):
+	- Solve polynomial equations (roots and intersections)
+	- Various algorithms to count, isolate, and find roots
 
 - Grapher:
-	- Work in progress.
+	- Work in progress
 
 ## Documentation
 

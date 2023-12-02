@@ -86,6 +86,7 @@ func newPolyNoReverse(coefficients []float64) Poly {
 
 // parseTerm returns the coefficient and exponent of a term in string form "(+|-)cx^n".
 func parseTerm(t string) (float64, int) {
+
 	var xpos, caratpos int
 	var sign, coef float64
 	var deg int64
@@ -140,7 +141,7 @@ func parseTerm(t string) (float64, int) {
 	return sign * coef, int(deg)
 }
 
-// NewPolyFromString returns a Poly represented in unordered standard form by the given string s.
+// NewPolyFromString returns a Poly represented by s.
 //
 // # Format:
 //   - Terms (without sign) have the form "cx^n", with c real and n natural (including 0).
@@ -203,10 +204,34 @@ func NewPolyFromString(s string) Poly {
 	return newPolyNoReverse(coefs)
 }
 
-// NewZeroPoly returns the Poly p(x) = 0.
-func NewZeroPoly() Poly {
+// NewPolyConst returns the Poly p(x) = a.
+func NewPolyConst(a float64) Poly {
 
-	return newPolyNoReverse([]float64{0})
+	return newPolyNoReverse([]float64{a})
+}
+
+// NewPolyZero returns the Poly p(x) = 0.
+func NewPolyZero() Poly {
+
+	return NewPolyConst(0)
+}
+
+// NewPolyLinear returns the Poly p(x) = ax + b.
+func NewPolyLinear(a, b float64) Poly {
+
+	return newPolyNoReverse([]float64{b, a})
+}
+
+// NewPolyQuadratic returns the Poly p(x) = ax^2 + bx + c.
+func NewPolyQuadratic(a, b, c float64) Poly {
+
+	return newPolyNoReverse([]float64{c, b, a})
+}
+
+// NewPolyCubic returns the Poly p(x) = ax^3 + bx^2 + cx + d.
+func NewPolyCubic(a, b, c, d float64) Poly {
+
+	return newPolyNoReverse([]float64{d, c, b, a})
 }
 
 // NewPolyWilkinson returns Wilkinson's polynomial.
@@ -237,11 +262,66 @@ func NewPolyWilkinson() Poly {
 	)
 }
 
-// Coefficients returns the coefficients c of p as a float64 slice such that
+// NewPolyFactored returns the Poly
 //
-//	p(x) = c[0]x^(n-1) + c[1]x^(n-2) + ... + c[n-2]x^1 + c[n-1]x^0,
+// p(x) = a(x - r[0])(x - r[1])...(x - r[n - 1]),
 //
-// where n = len(c).
+// where n = len(r).
+//
+// Panics for empty r.
+func NewPolyFactored(a float64, r []float64) Poly {
+
+	if len(r) == 0 {
+		log.Panic("NewPolyFactored: empty r.")
+	}
+
+	if a == 0 {
+		return NewPolyZero()
+	}
+
+	prod := newPolyNoReverse([]float64{-r[0], 1})
+
+	r = r[1:]
+
+	for _, b := range r {
+		prod = prod.Mul(newPolyNoReverse([]float64{-b, 1}))
+	}
+
+	return prod.MulScalar(a)
+}
+
+// NewPolyTaylorSin returns the Taylor polynomial of the sine function centered at a with degree n.
+//
+// Panics for negative n.
+func NewPolyTaylorSin(n int, a float64) Poly {
+
+	if n < 0 {
+		log.Panic("NewPolyTaylorSin: negative n.")
+	}
+
+	if n == 0 {
+		return NewPolyConst(math.Sin(a))
+	}
+
+	sina := math.Sin(a)
+	cosa := math.Cos(a)
+
+	derivCycle := [4]float64{
+		sina,
+		cosa,
+		-sina,
+		-cosa,
+	}
+
+	sum := NewPolyZero()
+	for i := 0; i <= n; i++ {
+		sum = sum.Add(NewPolyLinear(1, -a).Pow(i).MulScalar(derivCycle[i%4] / fact(i)))
+	}
+
+	return sum
+}
+
+// Coefficients returns the coefficients c of p ordered in decreasing degree.
 func (p Poly) Coefficients() []float64 {
 
 	return reverse(p.coef)
@@ -283,7 +363,7 @@ func (p Poly) CoefficientWithDegree(n uint) float64 {
 	return p.coef[n]
 }
 
-// Equal returns true if the p is equal to q, else false.
+// Equal returns true if the p is equal to q (all corresponding coefficients are equal), else false.
 func (p Poly) Equal(q Poly) bool {
 
 	if p.deg != q.deg {
@@ -291,7 +371,24 @@ func (p Poly) Equal(q Poly) bool {
 	}
 
 	for i := 0; i < p.len; i++ {
-		if !approxEqual(p.coef[i], q.coef[i]) {
+		if p.coef[i] == q.coef[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// EqualWithin returns true if the largest absolute difference between corresponding coefficients is
+// epsilon, else false.
+func (p Poly) EqualWithin(q Poly, epsilon float64) bool {
+
+	if p.deg != q.deg {
+		return false
+	}
+
+	for i := 0; i < p.len; i++ {
+		if equalWithin(p.coef[i], q.coef[i], epsilon) {
 			return false
 		}
 	}
@@ -309,13 +406,19 @@ func (p Poly) IsConstant() bool {
 func (p Poly) IsZero() bool {
 
 	// Check if p is a constant and if that constant is 0.
-	return p.deg == 0 && approxEqual(p.coef[0], 0)
+	return p.deg == 0 && p.coef[0] == 0
+}
+
+// IsZeroWithin returns true if |p - 0| <= epsilon, else false.
+func (p Poly) IsZeroWithin(epsilon float64) bool {
+
+	return p.deg == 0 && equalWithin(p.coef[0], 0, epsilon)
 }
 
 // IsMonic returns true p is monic (i.e. leading coefficient 1), else false.
 func (p Poly) IsMonic() bool {
 
-	return approxEqual(p.coef[p.deg], 1)
+	return p.coef[p.deg] == 1
 }
 
 // At returns the value of p evaluated at x.
@@ -393,8 +496,6 @@ func (p Poly) MulScalar(s float64) Poly {
 }
 
 // Mul returns the polynomial product pq.
-//
-// If speed is more important, use MulFast() instead (at the cost of accuracy).
 func (p Poly) Mul(q Poly) Poly {
 
 	// The product m will have deg(m) = deg(p) + deg(q).
@@ -412,15 +513,13 @@ func (p Poly) Mul(q Poly) Poly {
 
 // MulFast returns the polynomial product pq.
 //
-// This method uses an FFT algorithm to perform fast polynomial multiplication at the price of
-// small floating point errors in O(n log n) time.
+// This method uses an FFT algorithm to perform fast polynomial multiplication in O(n log n) time at
+// the price of small floating point errors.
 //
-// Due to floating point errors in the FFT algorithm (which are especially noticeable in large
-// coefficients), MulFast() should be used when equality checks are not rigorous and speed is a
-// requirement. If equality must be checked, the margin of error can be adjusted via SetEpsilon().
-//
-// If full accuracy is more important, use Mul() instead (at the cost of speed).
+// MulFast() should be used when precision is flexible are not rigorous and speed is a requirement.
+// If equality must be checked, use EqualWithin() instead of Equal().
 func (p Poly) MulFast(q Poly) Poly {
+
 	// Algorithm reference:
 	// https://faculty.sites.iastate.edu/jia/files/inline-files/polymultiply.pdf
 
@@ -461,6 +560,44 @@ func (p Poly) MulFast(q Poly) Poly {
 	return newPolyNoReverse(toFloat64(fft.IFFT(c))[:prodlen])
 }
 
+// Pow returns the polynomial power p^n.
+//
+// Panics for negative n.
+func (p Poly) Pow(n int) Poly {
+
+	if n < 0 {
+		log.Panic("Pow: negative n.")
+	}
+
+	prod := NewPolyConst(1)
+
+	for i := 0; i < n; i++ {
+		prod = prod.Mul(p)
+	}
+
+	return prod
+}
+
+// PowFast returns the polynomial power p^n.
+//
+// Be sure to read the documentation for MulFast(), as the behaviour is the same.
+//
+// Panics for negative n.
+func (p Poly) PowFast(n int) Poly {
+
+	if n < 0 {
+		log.Panic("PowFast: negative n.")
+	}
+
+	prod := NewPolyConst(1)
+
+	for i := 0; i < n; i++ {
+		prod = prod.MulFast(p)
+	}
+
+	return prod
+}
+
 // Div returns m (polynomial quotient) and n (polynomial remainder) such that p/q = m + n/q.
 //
 // Panics if q = 0.
@@ -473,12 +610,12 @@ func (p Poly) Div(q Poly) (Poly, Poly) {
 
 	// Dividing zero.
 	if p.IsZero() {
-		return NewZeroPoly(), NewZeroPoly()
+		return NewPolyZero(), NewPolyZero()
 	}
 
 	// Dividing by larger degree.
 	if p.deg < q.deg {
-		return NewZeroPoly(), p
+		return NewPolyZero(), p
 	}
 
 	// Implement expanded synthetic division for non-monic divisors.
@@ -564,34 +701,76 @@ func (p Poly) CauchyBound() float64 {
 }
 
 // String returns a string representation of p in decreasing-degree sum form.
-//
-// Terms are rounded to 5 decimal places.
-//
-// Terms with coefficients equal to zero are shown in the string for alignment purposes.
 func (p Poly) String() string {
 
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("[ %.5fx^%d", p.coef[p.deg], p.deg))
+	sb.WriteString(fmt.Sprintf("[ %fx^{%d}", p.coef[p.deg], p.deg))
 
-	var sgn, sgnlessCoef string
+	var sgn, strCoef string
 	for i := 1; i < p.len; i++ {
+
+		strCoef = fmt.Sprintf("%f", p.coef[p.deg-i])
 
 		if sign(p.coef[p.deg-i]) == -1 {
 			sgn = " - "
-			sgnlessCoef = fmt.Sprintf("%.5f", p.coef[p.deg-i])[1:]
+			strCoef = strCoef[1:]
 		} else {
 			sgn = " + "
-			sgnlessCoef = fmt.Sprintf("%.5f", p.coef[p.deg-i])
 		}
 
 		sb.WriteString(sgn)
-		sb.WriteString(fmt.Sprintf("%sx^%d", sgnlessCoef, p.deg-i))
+		sb.WriteString(fmt.Sprintf("%sx^{%d}", strCoef, p.deg-i))
 	}
 
 	sb.WriteString(" ]")
 
 	return sb.String()
+}
+
+// Stringn returns a string representation of p in decreasing-degree sum form with it's coefficients
+// to precision n.
+//
+// All n < 0 will be treated as n = 0.
+func (p Poly) Stringn(n int) string {
+
+	var sb strings.Builder
+
+	precisionFormat := fmt.Sprintf(".%d", n)
+	if n < 0 {
+		precisionFormat = ".0"
+	}
+
+	sb.WriteString(fmt.Sprintf("[ %"+precisionFormat+"fx^{%d}", p.coef[p.deg], p.deg))
+
+	var sgn, strCoef string
+	for i := 1; i < p.len; i++ {
+
+		strCoef = fmt.Sprintf("%"+precisionFormat+"f", p.coef[p.deg-i])
+
+		if sign(p.coef[p.deg-i]) == -1 {
+			sgn = " - "
+			strCoef = strCoef[1:]
+		} else {
+			sgn = " + "
+		}
+
+		sb.WriteString(sgn)
+		sb.WriteString(fmt.Sprintf("%sx^{%d}", strCoef, p.deg-i))
+	}
+
+	sb.WriteString(" ]")
+
+	return sb.String()
+}
+
+// Printn prints p to standard output with it's coefficients printed to precision n followed by a
+// newline.
+//
+// All n < 0 will be treated as n = 0.
+func (p Poly) Printn(n int) {
+
+	fmt.Println(p.Stringn(n))
 }
 
 // id returns a unqiue identifier for p.

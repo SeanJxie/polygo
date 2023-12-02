@@ -5,11 +5,6 @@ import (
 	"math"
 )
 
-var (
-	// The maximum absolute or relative error for two values to be considered equal.
-	epsilon = 1e-5
-)
-
 const (
 	ln2 = 0.693147180559945309417232121458176568075500134360255254120680009
 )
@@ -22,7 +17,7 @@ func removeTrailingZeroes(s []float64) []float64 {
 		return s
 	}
 
-	for approxEqual(s[len(s)-1], 0) && len(s) > 1 {
+	for s[len(s)-1] == 0 && len(s) > 1 {
 		s = s[:len(s)-1]
 	}
 
@@ -139,8 +134,8 @@ func min(s []float64) float64 {
 	return min
 }
 
-// approxEqual returns true if a and b are approximately equal, else false.
-func approxEqual(a, b float64) bool {
+// equalWithin returns true if |a - b| <= epsilon, else false.
+func equalWithin(a, b, epsilon float64) bool {
 
 	if a == b {
 		return true
@@ -157,7 +152,7 @@ func approxEqual(a, b float64) bool {
 // sign returns the sign of a.
 func sign(a float64) int {
 
-	if approxEqual(a, 0) {
+	if a == 0 {
 		return 0
 	}
 
@@ -168,20 +163,18 @@ func sign(a float64) int {
 	return -1
 }
 
-// SetEpsilon sets a variable named epsilon, which is the absolute or relative error for two values
-// to be considered equal in Polygo.
+// fact returns n factorial.
 //
-// Default is set to 1e-5 = 0.00001.
-//
-// Epsilon is used in equality checks all over the Polygo library, so the user should be sure to
-// test that the value they set works for their use case.
-//
-// Panics for negative v.
-func SetEpsilon(v float64) {
+// Panics for negative n.
+func fact(n int) float64 {
 
-	if v < 0 {
-		log.Panic("SetEpsilon: negative epsilon.")
+	if n < 0 {
+		log.Panic("fact: negative n.")
 	}
 
-	epsilon = v
+	if n == 0 {
+		return 1
+	}
+
+	return float64(n) * fact(n-1)
 }

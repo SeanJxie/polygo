@@ -414,93 +414,45 @@ func Test_min(t *testing.T) {
 	}
 }
 
-func Test_approxEqual(t *testing.T) {
+func Test_factPanic(t *testing.T) {
+
+	assert.Panics(t, func() { fact(-1) })
+	assert.Panics(t, func() { fact(-124) })
+}
+
+func Test_fact(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		argA float64
-		argB float64
-		want bool
-	}{
-		{
-			name: "equal small",
-			argA: 1,
-			argB: 1,
-			want: true,
-		},
-		{
-			name: "almost equal small",
-			argA: 0,
-			argB: 0.00000001,
-			want: true,
-		},
-		{
-			name: "equal medium",
-			argA: 152561,
-			argB: 152561,
-			want: true,
-		},
-		{
-			name: "almost equal medium",
-			argA: 152561,
-			argB: 152562,
-			want: true,
-		},
-		{
-			name: "equal big",
-			argA: 12597124871207512501924,
-			argB: 12597124871207512501924,
-			want: true,
-		},
-		{
-			name: "almost equal big",
-			argA: 12597124871207512501924,
-			argB: 12597124871207531111111,
-			want: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := approxEqual(tc.argA, tc.argB)
-			assert.Equal(t, tc.want, got)
-		})
-	}
-}
-
-func Test_SetEpsilonPanic(t *testing.T) {
-
-	assert.Panics(t, func() { SetEpsilon(-1e-10) })
-}
-
-func Test_SetEpsilon(t *testing.T) {
-
-	testCases := []struct {
-		name string
-		arg  float64
+		arg  int
 		want float64
 	}{
 		{
 			name: "zero",
 			arg:  0,
-			want: 0,
+			want: 1,
 		},
 		{
-			name: "small",
-			arg:  1e-10,
-			want: 1e-10,
+			name: "nonzero",
+			arg:  25,
+			want: 15511210043330985984000000,
 		},
 		{
 			name: "big",
-			arg:  1e100,
-			want: 1e100,
+			arg:  50,
+			want: 3.0414093201713376e+64,
+		},
+		{
+			name: "inf",
+			arg:  1000,
+			want: math.Inf(1),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			SetEpsilon(tc.arg)
-			assert.Equal(t, tc.want, epsilon)
+			got := fact(tc.arg)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

@@ -291,13 +291,255 @@ func Test_NewPolyFromString(t *testing.T) {
 	}
 }
 
-func Test_NewZeroPoly(t *testing.T) {
+func Test_NewPolyConst(t *testing.T) {
 
-	zp := NewZeroPoly()
+	zp := NewPolyConst(3.1415)
+
+	assert.Equal(t, []float64{3.1415}, zp.coef)
+	assert.Equal(t, 1, zp.len)
+	assert.Equal(t, 0, zp.deg)
+}
+
+func Test_NewPolyZero(t *testing.T) {
+
+	zp := NewPolyZero()
 
 	assert.Equal(t, []float64{0}, zp.coef)
 	assert.Equal(t, 1, zp.len)
 	assert.Equal(t, 0, zp.deg)
+}
+
+func Test_NewPolyWilkinson(t *testing.T) {
+
+	wp := NewPolyWilkinson()
+
+	wantCoef := reverse([]float64{
+		1,
+		-210,
+		20615,
+		-1256850,
+		53327946,
+		-1672280820,
+		40171771630,
+		-756111184500,
+		11310276995381,
+		-135585182899530,
+		1307535010540395,
+		-10142299865511450,
+		63030812099294896,
+		-311333643161390640,
+		1206647803780373360,
+		-3599979517947607200,
+		8037811822645051776,
+		-12870931245150988800,
+		13803759753640704000,
+		-8752948036761600000,
+		2432902008176640000,
+	})
+
+	assert.Equal(t, wantCoef, wp.coef)
+	assert.Equal(t, 21, wp.len)
+	assert.Equal(t, 20, wp.deg)
+}
+
+func Test_NewPolyFactoredPanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewPolyFactored(123, []float64{}) })
+}
+
+func Test_NewPolyFactored(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		argA      float64
+		argR      []float64
+		wantCoefs []float64
+		wantLen   int
+		wantDeg   int
+	}{
+		{
+			name:      "zero",
+			argA:      0,
+			argR:      []float64{0},
+			wantCoefs: []float64{0},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "linear",
+			argA:      5,
+			argR:      []float64{-1},
+			wantCoefs: []float64{5, 5},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "quadratic",
+			argA:      1,
+			argR:      []float64{2, 3},
+			wantCoefs: []float64{6, -5, 1},
+			wantLen:   3,
+			wantDeg:   2,
+		},
+		{
+			name:      "cubic",
+			argA:      2,
+			argR:      []float64{5, 4, 3},
+			wantCoefs: []float64{-120, 94, -24, 2},
+			wantLen:   4,
+			wantDeg:   3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NewPolyFactored(tc.argA, tc.argR)
+			t.Log(got)
+
+			assert.Equal(t, tc.wantCoefs, got.coef)
+			assert.Equal(t, tc.wantLen, got.len)
+			assert.Equal(t, tc.wantDeg, got.deg)
+		})
+	}
+}
+
+func Test_NewPolyTaylorSinPanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewPolyTaylorSin(-1, 1) })
+	assert.Panics(t, func() { NewPolyTaylorSin(-1248, -63) })
+}
+
+func Test_NewPolyTaylorSin(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		argN      int
+		argA      float64
+		wantCoefs []float64
+		wantLen   int
+		wantDeg   int
+	}{
+		{
+			name:      "Maclaurin deg 0",
+			argN:      0,
+			argA:      0,
+			wantCoefs: []float64{math.Sin(0)},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "Taylor at 1 deg 0",
+			argN:      0,
+			argA:      1,
+			wantCoefs: []float64{math.Sin(1)},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "Maclaurin deg 1",
+			argN:      1,
+			argA:      0,
+			wantCoefs: []float64{0, 1},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "Maclaurin deg 2",
+			argN:      2,
+			argA:      0,
+			wantCoefs: []float64{0, 1},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "Maclaurin deg 3",
+			argN:      3,
+			argA:      0,
+			wantCoefs: []float64{0, 1, 0, -1 / fact(3)},
+			wantLen:   4,
+			wantDeg:   3,
+		},
+		{
+			name: "Maclaurin deg 10",
+			argN: 10,
+			argA: 0,
+			wantCoefs: []float64{0, 1, 0, -0.16666666666666666, 0, 0.008333333333333333, 0,
+				-0.0001984126984126984, 0, 2.7557319223985893e-06},
+			wantLen: 10,
+			wantDeg: 9, // For default epsilon, best we can do is deg 9.
+		},
+		{
+			name:      "Taylor at 1 deg 1",
+			argN:      1,
+			argA:      1,
+			wantCoefs: []float64{0.30116867893975674, 0.5403023058681398},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "Taylor at 1 deg 2",
+			argN:      2,
+			argA:      1,
+			wantCoefs: []float64{-0.11956681346419151, 1.3817732906760363, -0.42073549240394825},
+			wantLen:   3,
+			wantDeg:   2,
+		},
+		{
+			name: "Taylor at 1 deg 3",
+			argN: 3,
+			argA: 1,
+			wantCoefs: []float64{-0.02951642915283488, 1.1116221377419664, -0.15058433946987837,
+				-0.09005038431135663},
+			wantLen: 4,
+			wantDeg: 3,
+		},
+		{
+			name: "Taylor at 1 deg 10",
+			argN: 10,
+			argA: 1,
+			wantCoefs: []float64{-1.5196462559423447e-08, 1.0000001687171585,
+				-8.528093474674307e-07, -0.16666407491564922, -5.265293160941084e-06,
+				0.00834084856576574, -7.70119705670489e-06, -0.00019273352650938828,
+				-2.9654467625047508e-06, 3.807796766633698e-06, -2.3188684546072984e-07},
+			wantLen: 11,
+			wantDeg: 10,
+		},
+		{
+			name: "Taylor at 1 deg 50",
+			argN: 50,
+			argA: 1,
+			wantCoefs: []float64{
+				-3.9195392259798626e-17, 1.0000000000000002, 1.60198421891246e-17,
+				-0.16666666666666663, -7.769784824795162e-18, 0.008333333333333335,
+				-1.469069077880964e-20, -0.00019841269841269836, -1.7536242580586098e-21,
+				2.7557319223985897e-06, 3.331078944386683e-23, -2.505210838544173e-08,
+				-1.5173629625498664e-25, 1.6059043836821619e-10, -1.058951257234695e-28,
+				-7.647163731819818e-13, 1.2476377341865343e-31, 2.8114572543455206e-15,
+				8.178785303513588e-33, -8.220635246624333e-18, 5.873966728766431e-36,
+				1.957294106339126e-20, 1.1487350833336406e-38, -3.8681701706306824e-23,
+				-1.0934801595580858e-40, 6.446950284384472e-26, 4.4612856285855765e-44,
+				-9.183689863795543e-29, -2.729810664078527e-47, 1.1309962886447714e-31,
+				1.2198621477645828e-50, -1.216125041553518e-34, -2.6342522847488516e-52,
+				1.1516335620771955e-37, -5.541906320036663e-54, -9.67759295863162e-41,
+				-1.214647260443147e-54, 7.265460179202573e-44, -1.8348734750871204e-55,
+				-4.902469750354594e-47, -1.8625049518972674e-56, 2.989311331490434e-50,
+				-1.2139581980144593e-57, -1.6551851283754923e-53, -4.753729342811867e-59,
+				8.367189813483244e-57, -1.0076762895559066e-60, -3.755953903954799e-60,
+				-9.63167604716772e-63, 2.2716003424987766e-63, -2.7667140336128526e-65},
+			wantLen: 51,
+			wantDeg: 50,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NewPolyTaylorSin(tc.argN, tc.argA)
+
+			assert.Equal(t, tc.wantCoefs, got.coef)
+			assert.Equal(t, tc.wantLen, got.len)
+			assert.Equal(t, tc.wantDeg, got.deg)
+		})
+	}
 }
 
 func Test_PolyProperties(t *testing.T) {
@@ -322,7 +564,7 @@ func Test_PolyProperties(t *testing.T) {
 	}{
 		{
 			name:      "zero",
-			arg:       NewZeroPoly(),
+			arg:       NewPolyZero(),
 			wantCoefs: []float64{0},
 			wantDeg:   0,
 			wantLead:  0,
@@ -403,7 +645,7 @@ func Test_PolyCoefficientWithDegree(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
+			argP: NewPolyZero(),
 			argN: 0,
 			want: 0,
 		},
@@ -440,53 +682,8 @@ func Test_PolyEqual(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
-			argQ: NewZeroPoly(),
-			want: true,
-		},
-		{
-			name: "deg(p) != deg(q)",
-			argP: NewPoly([]float64{1, 2, 3}),
-			argQ: NewPoly([]float64{4, 5, 6, 7}),
-			want: false,
-		},
-		{
-			name: "deg(p) == deg(q), p != q",
-			argP: NewPoly([]float64{1, 2, 3, 2}),
-			argQ: NewPoly([]float64{4, 5, 6, 7}),
-			want: false,
-		},
-		{
-			name: "deg(p) == deg(q), p == q",
-			argP: NewPoly([]float64{3, 1, 4, 1}),
-			argQ: NewPoly([]float64{3, 1, 4, 1}),
-			want: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got1 := tc.argP.Equal(tc.argQ)
-			got2 := tc.argQ.Equal(tc.argP)
-
-			assert.Equal(t, tc.want, got1)
-			assert.Equal(t, tc.want, got2)
-		})
-	}
-}
-
-func Test_PolyApproxEqual(t *testing.T) {
-
-	testCases := []struct {
-		name string
-		argP Poly
-		argQ Poly
-		want bool
-	}{
-		{
-			name: "zero",
-			argP: NewZeroPoly(),
-			argQ: NewZeroPoly(),
+			argP: NewPolyZero(),
+			argQ: NewPolyZero(),
 			want: true,
 		},
 		{
@@ -509,8 +706,8 @@ func Test_PolyApproxEqual(t *testing.T) {
 		},
 		{
 			name: "deg(p) == deg(q), p ~= q",
-			argP: NewPoly([]float64{125125124, 1.000001, 4, 1.00002}),
-			argQ: NewPoly([]float64{125125125, 1, 4.000002, 1}),
+			argP: NewPoly([]float64{125125124, 1.0000001, 4, 1.000002}),
+			argQ: NewPoly([]float64{125125125, 1, 4.0000002, 1}),
 			want: true,
 		},
 	}
@@ -544,7 +741,7 @@ func Test_PolyBooleanChecks(t *testing.T) {
 	}{
 		{
 			name:      "zero",
-			arg:       NewZeroPoly(),
+			arg:       NewPolyZero(),
 			wantConst: true,
 			wantZero:  true,
 			wantMonic: false,
@@ -588,7 +785,7 @@ func Test_PolyAt(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
+			argP: NewPolyZero(),
 			argX: 0,
 			want: 0,
 		},
@@ -625,9 +822,9 @@ func Test_PolyAdd(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
-			argQ: NewZeroPoly(),
-			want: NewZeroPoly(),
+			argP: NewPolyZero(),
+			argQ: NewPolyZero(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "nonzero const",
@@ -670,9 +867,9 @@ func Test_PolySub(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
-			argQ: NewZeroPoly(),
-			want: NewZeroPoly(),
+			argP: NewPolyZero(),
+			argQ: NewPolyZero(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "nonzero const",
@@ -713,9 +910,9 @@ func Test_PolyMulScalar(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
+			argP: NewPolyZero(),
 			argS: 0,
-			want: NewZeroPoly(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "identity",
@@ -762,15 +959,15 @@ func Test_PolyMul(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
-			argQ: NewZeroPoly(),
-			want: NewZeroPoly(),
+			argP: NewPolyZero(),
+			argQ: NewPolyZero(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "vanish",
-			argP: NewZeroPoly(),
+			argP: NewPolyZero(),
 			argQ: NewPoly([]float64{12, 24124, 1, 2, 5, 124}),
-			want: NewZeroPoly(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "deg(p) == deq(q)",
@@ -802,15 +999,15 @@ func Test_PolyMulFast(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			argP: NewZeroPoly(),
-			argQ: NewZeroPoly(),
-			want: NewZeroPoly(),
+			argP: NewPolyZero(),
+			argQ: NewPolyZero(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "vanish",
-			argP: NewZeroPoly(),
+			argP: NewPolyZero(),
 			argQ: NewPoly([]float64{12, 24124, 1, 2, 5, 124}),
-			want: NewZeroPoly(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "deg(p) == deq(q)",
@@ -832,10 +1029,58 @@ func Test_PolyMulFast(t *testing.T) {
 	}
 }
 
+func Test_PolyPowPanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewPolyLinear(1, 2).Pow(-1) })
+}
+
+func Test_PolyPow(t *testing.T) {
+
+	testCases := []struct {
+		name string
+		argP Poly
+		argN int
+		want Poly
+	}{
+		{
+			name: "to the zero",
+			argP: NewPolyZero(),
+			argN: 0,
+			want: NewPolyConst(1),
+		},
+		{
+			name: "to the one",
+			argP: NewPolyQuadratic(1, 2, 3),
+			argN: 1,
+			want: NewPolyQuadratic(1, 2, 3),
+		},
+		{
+			name: "quadratic from binom",
+			argP: NewPolyLinear(1, -2),
+			argN: 2,
+			want: NewPolyQuadratic(1, -4, 4),
+		},
+		{
+			name: "large n",
+			argP: NewPolyLinear(1, 0),
+			argN: 100,
+			want: NewPoly(append([]float64{1}, make([]float64, 100)...)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.argP.Pow(tc.argN)
+
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func Test_PolyDivZeroPanic(t *testing.T) {
 
-	assert.Panics(t, func() { NewZeroPoly().Div(NewZeroPoly()) })
-	assert.Panics(t, func() { NewPoly([]float64{123}).Div(NewZeroPoly()) })
+	assert.Panics(t, func() { NewPolyZero().Div(NewPolyZero()) })
+	assert.Panics(t, func() { NewPoly([]float64{123}).Div(NewPolyZero()) })
 }
 
 func Test_PolyDiv(t *testing.T) {
@@ -849,17 +1094,17 @@ func Test_PolyDiv(t *testing.T) {
 	}{
 		{
 			name:    "zero",
-			argP:    NewZeroPoly(),
+			argP:    NewPolyZero(),
 			argQ:    NewPoly([]float64{1}),
-			wantQuo: NewZeroPoly(),
-			wantRem: NewZeroPoly(),
+			wantQuo: NewPolyZero(),
+			wantRem: NewPolyZero(),
 		},
 		{
 			name:    "equal linear",
 			argP:    NewPoly([]float64{125, 254}),
 			argQ:    NewPoly([]float64{125, 254}),
 			wantQuo: NewPoly([]float64{1}),
-			wantRem: NewZeroPoly(),
+			wantRem: NewPolyZero(),
 		},
 		{
 			name:    "cubic div linear",
@@ -872,7 +1117,7 @@ func Test_PolyDiv(t *testing.T) {
 			name:    "deg(q) > deg(p)",
 			argP:    NewPoly([]float64{1, -3}),
 			argQ:    NewPoly([]float64{1, -12, 0, -42}),
-			wantQuo: NewZeroPoly(),
+			wantQuo: NewPolyZero(),
 			wantRem: NewPoly([]float64{1, -3}),
 		},
 	}
@@ -895,13 +1140,13 @@ func Test_PolyDerivative(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			arg:  NewZeroPoly(),
-			want: NewZeroPoly(),
+			arg:  NewPolyZero(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "nonzero const",
 			arg:  NewPoly([]float64{3.1415}),
-			want: NewZeroPoly(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "linear",
@@ -932,8 +1177,8 @@ func Test_PolyReciprocal(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			arg:  NewZeroPoly(),
-			want: NewZeroPoly(),
+			arg:  NewPolyZero(),
+			want: NewPolyZero(),
 		},
 		{
 			name: "nonzero const",
@@ -963,7 +1208,7 @@ func Test_PolyReciprocal(t *testing.T) {
 
 func Test_PolyCauchyBoundPanic(t *testing.T) {
 
-	assert.Panics(t, func() { NewZeroPoly().CauchyBound() })
+	assert.Panics(t, func() { NewPolyZero().CauchyBound() })
 	assert.Panics(t, func() { NewPoly([]float64{3.14}).CauchyBound() })
 }
 
@@ -1007,38 +1252,38 @@ func Test_PolyString(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			arg:  NewZeroPoly(),
-			want: "[ 0.00000x^0 ]",
+			arg:  NewPolyZero(),
+			want: "[ 0.000000x^0 ]",
 		},
 		{
 			name: "negative const",
 			arg:  NewPoly([]float64{-21}),
-			want: "[ -21.00000x^0 ]",
+			want: "[ -21.000000x^0 ]",
 		},
 		{
 			name: "nonzero const",
 			arg:  NewPoly([]float64{3.1415}),
-			want: "[ 3.14150x^0 ]",
+			want: "[ 3.141500x^0 ]",
 		},
 		{
 			name: "linear",
 			arg:  NewPoly([]float64{125124, 1.1715}),
-			want: "[ 125124.00000x^1 + 1.17150x^0 ]",
+			want: "[ 125124.000000x^1 + 1.171500x^0 ]",
 		},
 		{
 			name: "quadratic",
 			arg:  NewPoly([]float64{47346346, 734334, 2342366}),
-			want: "[ 47346346.00000x^2 + 734334.00000x^1 + 2342366.00000x^0 ]",
+			want: "[ 47346346.000000x^2 + 734334.000000x^1 + 2342366.000000x^0 ]",
 		},
 		{
 			name: "cubic",
 			arg:  NewPoly([]float64{2152, 47346346, 734334, 2342366}),
-			want: "[ 2152.00000x^3 + 47346346.00000x^2 + 734334.00000x^1 + 2342366.00000x^0 ]",
+			want: "[ 2152.000000x^3 + 47346346.000000x^2 + 734334.000000x^1 + 2342366.000000x^0 ]",
 		},
 		{
 			name: "cubic with negative",
 			arg:  NewPoly([]float64{-2152, 47346346, -734334, 2342366}),
-			want: "[ -2152.00000x^3 + 47346346.00000x^2 - 734334.00000x^1 + 2342366.00000x^0 ]",
+			want: "[ -2152.000000x^3 + 47346346.000000x^2 - 734334.000000x^1 + 2342366.000000x^0 ]",
 		},
 	}
 
@@ -1058,7 +1303,7 @@ func Test_Poly_id(t *testing.T) {
 	}{
 		{
 			name: "zero",
-			arg:  NewZeroPoly(),
+			arg:  NewPolyZero(),
 		},
 		{
 			name: "negative const",
