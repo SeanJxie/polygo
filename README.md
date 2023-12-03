@@ -18,6 +18,7 @@ Note: Polygo is being currently being rewritten. The following features are expe
 		- Factored form
 		- Taylor (trigonometric, exp)
 		- Wilkinson's
+		- Chebyshev (of the first and second kind)
 
 - Binary operations:
 	- Addition
