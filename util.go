@@ -134,8 +134,9 @@ func min(s []float64) float64 {
 	return min
 }
 
-// equalWithin returns true if |a - b| <= epsilon, else false.
-func equalWithin(a, b, epsilon float64) bool {
+// equalRel returns true if the relative error between a and b is at most maxPercentErr, else
+// false.
+func equalRel(a, b, maxPercentErr float64) bool {
 
 	if a == b {
 		return true
@@ -143,10 +144,7 @@ func equalWithin(a, b, epsilon float64) bool {
 
 	// For a visualization of the error check: https://www.desmos.com/calculator/8bfr35y3k5.
 
-	absErr := math.Abs(a - b)
-	relErr := absErr / math.Abs(a+b)
-
-	return absErr <= epsilon || relErr <= epsilon
+	return math.Abs(a-b)/math.Abs(a+b) <= maxPercentErr
 }
 
 // sign returns the sign of a.

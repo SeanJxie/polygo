@@ -542,6 +542,132 @@ func Test_NewPolyTaylorSin(t *testing.T) {
 	}
 }
 
+func Test_NewPolyChebyshevPanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewPolyChebyshev1(-1) })
+	assert.Panics(t, func() { NewPolyChebyshev2(-1) })
+}
+
+func Test_NewPolyChebyshev1(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		arg       int
+		wantCoefs []float64
+		wantLen   int
+		wantDeg   int
+	}{
+		{
+			name:      "n = 0",
+			arg:       0,
+			wantCoefs: []float64{1},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "n = 1",
+			arg:       1,
+			wantCoefs: []float64{0, 1},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "n = 2",
+			arg:       2,
+			wantCoefs: []float64{-1, 0, 2},
+			wantLen:   3,
+			wantDeg:   2,
+		},
+		{
+			name:      "n = 3",
+			arg:       3,
+			wantCoefs: []float64{0, -3, 0, 4},
+			wantLen:   4,
+			wantDeg:   3,
+		},
+		{
+			name: "n = 20",
+			arg:  20,
+			wantCoefs: []float64{1, 0, -200, 0, 6600, 0, -84480, 0, 549120, 0, -2.050048e+06, 0,
+				4.6592e+06, 0, -6.5536e+06, 0, 5.57056e+06, 0, -2.62144e+06, 0, 524288},
+			wantLen: 21,
+			wantDeg: 20,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NewPolyChebyshev1(tc.arg)
+
+			t.Log(got.Stringn(0))
+
+			assert.Equal(t, tc.wantCoefs, got.coef)
+			assert.Equal(t, tc.wantLen, got.len)
+			assert.Equal(t, tc.wantDeg, got.deg)
+		})
+	}
+}
+
+func Test_NewPolyChebyshev2(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		arg       int
+		wantCoefs []float64
+		wantLen   int
+		wantDeg   int
+	}{
+		{
+			name:      "n = 0",
+			arg:       0,
+			wantCoefs: []float64{1},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "n = 1",
+			arg:       1,
+			wantCoefs: []float64{0, 2},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "n = 2",
+			arg:       2,
+			wantCoefs: []float64{-1, 0, 4},
+			wantLen:   3,
+			wantDeg:   2,
+		},
+		{
+			name:      "n = 3",
+			arg:       3,
+			wantCoefs: []float64{0, -4, 0, 8},
+			wantLen:   4,
+			wantDeg:   3,
+		},
+		{
+			name: "n = 20",
+			arg:  20,
+			wantCoefs: []float64{1, 0, -220, 0, 7920, 0, -109824, 0, 768768, 0, -3.075072e+06, 0,
+				7.45472e+06, 0, -1.114112e+07, 0, 1.0027008e+07, 0, -4.980736e+06, 0, 1.048576e+06},
+			wantLen: 21,
+			wantDeg: 20,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NewPolyChebyshev2(tc.arg)
+
+			t.Log(got.Stringn(0))
+
+			assert.Equal(t, tc.wantCoefs, got.coef)
+			assert.Equal(t, tc.wantLen, got.len)
+			assert.Equal(t, tc.wantDeg, got.deg)
+		})
+	}
+}
+
 func Test_PolyProperties(t *testing.T) {
 
 	// Test_Poly the property "getters".
@@ -1200,44 +1326,6 @@ func Test_PolyReciprocal(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := tc.arg.Reciprocal()
-
-			assert.Equal(t, tc.want, got)
-		})
-	}
-}
-
-func Test_PolyCauchyBoundPanic(t *testing.T) {
-
-	assert.Panics(t, func() { NewPolyZero().CauchyBound() })
-	assert.Panics(t, func() { NewPoly([]float64{3.14}).CauchyBound() })
-}
-
-func Test_PolyCauchyBound(t *testing.T) {
-	testCases := []struct {
-		name string
-		arg  Poly
-		want float64
-	}{
-		{
-			name: "linear",
-			arg:  NewPoly([]float64{125124, 1.1715}),
-			want: 1.0000093627121895,
-		},
-		{
-			name: "quadratic",
-			arg:  NewPoly([]float64{1, -1, 0}),
-			want: 2,
-		},
-		{
-			name: "wilkinson",
-			arg:  NewPolyWilkinson(),
-			want: 1.3803759753640704e19,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := tc.arg.CauchyBound()
 
 			assert.Equal(t, tc.want, got)
 		})

@@ -20,7 +20,7 @@ type Poly struct {
 	deg  int
 }
 
-// NewPoly returns a Poly p with the given coefficients.
+// NewPoly returns a polynomial p with the given coefficients.
 //
 // Let c = coefficients and let n = len(c). Then, p is defined by
 //
@@ -67,7 +67,7 @@ func NewPoly(coefficients []float64) Poly {
 //
 // This is needed because we internally represent coefs as a slice with increasing degree, whereas
 // the user interacts with coefs slices with decreasing degree. So, having this function allows us
-// to return new Polys without having to compensate for the difference in representation
+// to return new Polys without having to compensate for the difference in representation.
 //
 // Doesn't do the empty panic check like in NewPoly().
 func newPolyNoReverse(coefficients []float64) Poly {
@@ -85,6 +85,8 @@ func newPolyNoReverse(coefficients []float64) Poly {
 }
 
 // parseTerm returns the coefficient and exponent of a term in string form "(+|-)cx^n".
+//
+// Panics for invalid terms.
 func parseTerm(t string) (float64, int) {
 
 	var xpos, caratpos int
@@ -141,7 +143,7 @@ func parseTerm(t string) (float64, int) {
 	return sign * coef, int(deg)
 }
 
-// NewPolyFromString returns a Poly represented by s.
+// NewPolyFromString returns a polynomial represented by s.
 //
 // # Format:
 //   - Terms (without sign) have the form "cx^n", with c real and n natural (including 0).
@@ -204,31 +206,31 @@ func NewPolyFromString(s string) Poly {
 	return newPolyNoReverse(coefs)
 }
 
-// NewPolyConst returns the Poly p(x) = a.
+// NewPolyConst returns the polynomial p(x) = a.
 func NewPolyConst(a float64) Poly {
 
 	return newPolyNoReverse([]float64{a})
 }
 
-// NewPolyZero returns the Poly p(x) = 0.
+// NewPolyZero returns the polynomial p(x) = 0.
 func NewPolyZero() Poly {
 
 	return NewPolyConst(0)
 }
 
-// NewPolyLinear returns the Poly p(x) = ax + b.
+// NewPolyLinear returns the polynomial p(x) = ax + b.
 func NewPolyLinear(a, b float64) Poly {
 
 	return newPolyNoReverse([]float64{b, a})
 }
 
-// NewPolyQuadratic returns the Poly p(x) = ax^2 + bx + c.
+// NewPolyQuadratic returns the polynomial p(x) = ax^2 + bx + c.
 func NewPolyQuadratic(a, b, c float64) Poly {
 
 	return newPolyNoReverse([]float64{c, b, a})
 }
 
-// NewPolyCubic returns the Poly p(x) = ax^3 + bx^2 + cx + d.
+// NewPolyCubic returns the polynomial p(x) = ax^3 + bx^2 + cx + d.
 func NewPolyCubic(a, b, c, d float64) Poly {
 
 	return newPolyNoReverse([]float64{d, c, b, a})
@@ -262,7 +264,7 @@ func NewPolyWilkinson() Poly {
 	)
 }
 
-// NewPolyFactored returns the Poly
+// NewPolyFactored returns the polynomial
 //
 // p(x) = a(x - r[0])(x - r[1])...(x - r[n - 1]),
 //
@@ -319,6 +321,46 @@ func NewPolyTaylorSin(n int, a float64) Poly {
 	}
 
 	return sum
+}
+
+// NewPolyChebyshev1 returns the nth Chebyshev polynomial of the first kind.
+//
+// Panics for negative n.
+func NewPolyChebyshev1(n int) Poly {
+
+	if n < 0 {
+		log.Panic("NewPolyChebyshev1: negative n.")
+	}
+
+	if n == 0 {
+		return NewPolyConst(1)
+	}
+
+	if n == 1 {
+		return NewPolyLinear(1, 0)
+	}
+
+	return NewPolyLinear(2, 0).Mul(NewPolyChebyshev1(n - 1)).Sub(NewPolyChebyshev1(n - 2))
+}
+
+// NewPolyChebyshev2 returns the nth Chebyshev polynomial of the second kind.
+//
+// Panics for negative n.
+func NewPolyChebyshev2(n int) Poly {
+
+	if n < 0 {
+		log.Panic("NewPolyChebyshev2: negative n.")
+	}
+
+	if n == 0 {
+		return NewPolyConst(1)
+	}
+
+	if n == 1 {
+		return NewPolyLinear(2, 0)
+	}
+
+	return NewPolyLinear(2, 0).Mul(NewPolyChebyshev2(n - 1)).Sub(NewPolyChebyshev2(n - 2))
 }
 
 // Coefficients returns the coefficients c of p ordered in decreasing degree.
@@ -379,16 +421,16 @@ func (p Poly) Equal(q Poly) bool {
 	return true
 }
 
-// EqualWithin returns true if the largest absolute difference between corresponding coefficients is
-// epsilon, else false.
-func (p Poly) EqualWithin(q Poly, epsilon float64) bool {
+// EqualRel returns true if the largest relative difference between corresponding coefficients is
+// maxPercentErr, else false.
+func (p Poly) EqualRel(q Poly, maxPercentErr float64) bool {
 
 	if p.deg != q.deg {
 		return false
 	}
 
 	for i := 0; i < p.len; i++ {
-		if equalWithin(p.coef[i], q.coef[i], epsilon) {
+		if equalRel(p.coef[i], q.coef[i], maxPercentErr) {
 			return false
 		}
 	}
@@ -409,10 +451,11 @@ func (p Poly) IsZero() bool {
 	return p.deg == 0 && p.coef[0] == 0
 }
 
-// IsZeroWithin returns true if |p - 0| <= epsilon, else false.
-func (p Poly) IsZeroWithin(epsilon float64) bool {
+// IsZeroRel returns true if the largest relative difference between p and 0 is maxPercentErr,
+// else false.
+func (p Poly) IsZeroRel(maxPercentErr float64) bool {
 
-	return p.deg == 0 && equalWithin(p.coef[0], 0, epsilon)
+	return p.deg == 0 && equalRel(p.coef[0], 0, maxPercentErr)
 }
 
 // IsMonic returns true p is monic (i.e. leading coefficient 1), else false.
@@ -670,34 +713,6 @@ func (p Poly) Reciprocal() Poly {
 	// it back into NewPoly() to reverse the coefficient slice again.
 
 	return NewPoly(p.coef)
-}
-
-// CauchyBound returns Cauchy's root bound of p.
-//
-// If p(x) = 0, then |x| <= p.CauchyBound().
-//
-// Panics for constant p.
-func (p Poly) CauchyBound() float64 {
-
-	if p.deg == 0 {
-		panic("CauchyBound: constant polynomial.")
-	}
-
-	// Compute Cauchy's bound.
-
-	leadrecip := 1 / p.coef[p.deg]
-	maxi := math.Abs(p.coef[0] * leadrecip)
-	var tmp float64
-
-	for i := 1; i < p.deg; i++ {
-		tmp = math.Abs(p.coef[i] * leadrecip)
-
-		if tmp > maxi {
-			maxi = tmp
-		}
-	}
-
-	return 1 + maxi
 }
 
 // String returns a string representation of p in decreasing-degree sum form.
