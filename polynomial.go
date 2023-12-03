@@ -421,16 +421,16 @@ func (p Poly) Equal(q Poly) bool {
 	return true
 }
 
-// EqualRel returns true if the largest relative difference between corresponding coefficients is
-// maxPercentErr, else false.
-func (p Poly) EqualRel(q Poly, maxPercentErr float64) bool {
+// EqualRel returns true if p and q are equal with some maximum relative error epsilon (all
+// corresponding coefficients have relative error at most epsilon), else false.
+func (p Poly) EqualRel(q Poly, epsilon float64) bool {
 
 	if p.deg != q.deg {
 		return false
 	}
 
 	for i := 0; i < p.len; i++ {
-		if equalRel(p.coef[i], q.coef[i], maxPercentErr) {
+		if equalRel(p.coef[i], q.coef[i], epsilon) {
 			return false
 		}
 	}
@@ -451,17 +451,23 @@ func (p Poly) IsZero() bool {
 	return p.deg == 0 && p.coef[0] == 0
 }
 
-// IsZeroRel returns true if the largest relative difference between p and 0 is maxPercentErr,
-// else false.
-func (p Poly) IsZeroRel(maxPercentErr float64) bool {
+// IsZeroRel returns true if the largest relative difference between p and 0 is epsilon, else false.
+func (p Poly) IsZeroRel(epsilon float64) bool {
 
-	return p.deg == 0 && equalRel(p.coef[0], 0, maxPercentErr)
+	return p.deg == 0 && equalRel(p.coef[0], 0, epsilon)
 }
 
 // IsMonic returns true p is monic (i.e. leading coefficient 1), else false.
 func (p Poly) IsMonic() bool {
 
 	return p.coef[p.deg] == 1
+}
+
+// IsMonic returns true if largest relative difference between the leading coefficent of p and 1 is
+// epsilon, else false.
+func (p Poly) IsMonicRel(epsilon float64) bool {
+
+	return equalRel(p.coef[p.deg], 1, epsilon)
 }
 
 // At returns the value of p evaluated at x.
