@@ -175,3 +175,15 @@ func fact(n int) float64 {
 
 	return float64(n) * fact(n-1)
 }
+
+// choose returns the binomial coefficient n choose k.
+//
+// Panics for negative n, k or if k > n.
+func choose(n, k int) float64 {
+
+	if n < 0 || k < 0 || k > n {
+		log.Panicf("choose: invalid binomial coefficient: %dC%d.", n, k)
+	}
+
+	return fact(n) / (fact(k) * fact(n-k))
+}
