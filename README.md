@@ -1,6 +1,7 @@
-# Polygo
+<p align="center">
+    <img alt="logo" src="logo.jpg", width=500px>
+</p>
 
-A polynomial library written in Go.
 ```
 go get github.com/SeanJxie/polygo@main
 ```
@@ -19,6 +20,8 @@ Note: Polygo is being currently being rewritten. The following features are expe
 		- Taylor (trigonometric, exp)
 		- Wilkinson's
 		- Chebyshev (of the first and second kind)
+		- Legendre
+		- Laguerre
 
 - Binary operations:
 	- Addition
@@ -30,21 +33,23 @@ Note: Polygo is being currently being rewritten. The following features are expe
 
 - Unary operations/properties:
 	- Evaluation (using Horner's scheme)
-	- Coefficients (leading, largest, n-th degree, etc.)
+	- Coefficients (leading, largest, nth degree, etc.)
 	- Degree
 	- Reciprocal 
 	- Boolean checks (constant, zero, monic, etc.)
-	- Cauchy's root bound
 
 - Calculus:
-	- Derivative
+	- Derivative, nth derivative
 
-- Solver (mildly unstable):
-	- Solve polynomial equations (roots and intersections)
-	- Various algorithms to count, isolate, and find roots
+- Solving (mildly unstable):
+	- Various algorithms to solve polynomial equations (roots and intersections)
+		- Newton-Raphson (real)
+		- Bisection (real)
+	
+	- Cauchy's root bound
 
 - Grapher:
-	- Work in progress
+	- Rewrite in progress
 
 ## Documentation
 
