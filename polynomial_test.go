@@ -668,6 +668,136 @@ func Test_NewPolyChebyshev2(t *testing.T) {
 	}
 }
 
+func Test_NewPolyLegendrePanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewPolyLegendre(-1) })
+}
+
+func Test_NewPolyLegendre(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		arg       int
+		wantCoefs []float64
+		wantLen   int
+		wantDeg   int
+	}{
+		{
+			name:      "n = 0",
+			arg:       0,
+			wantCoefs: []float64{1},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "n = 1",
+			arg:       1,
+			wantCoefs: []float64{0, 1},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "n = 2",
+			arg:       2,
+			wantCoefs: []float64{-1. / 2, 0, 3. / 2},
+			wantLen:   3,
+			wantDeg:   2,
+		},
+		{
+			name:      "n = 3",
+			arg:       3,
+			wantCoefs: []float64{0, -3. / 2, 0, 5. / 2},
+			wantLen:   4,
+			wantDeg:   3,
+		},
+		{
+			name: "n = 10",
+			arg:  10,
+			wantCoefs: []float64{-0.24609374999999997, 0, 13.535156249999998, 0,
+				-117.30468749999999, 0, 351.91406249999994, 0, -427.32421874999994, 0,
+				180.42578124999997},
+			wantLen: 11,
+			wantDeg: 10,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NewPolyLegendre(tc.arg)
+
+			t.Log(got.Stringn(10))
+
+			assert.Equal(t, tc.wantCoefs, got.coef)
+			assert.Equal(t, tc.wantLen, got.len)
+			assert.Equal(t, tc.wantDeg, got.deg)
+		})
+	}
+}
+func Test_NewPolyLaguerrePanic(t *testing.T) {
+
+	assert.Panics(t, func() { NewPolyLaguerre(-1) })
+}
+
+func Test_NewPolyLaguerre(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		arg       int
+		wantCoefs []float64
+		wantLen   int
+		wantDeg   int
+	}{
+		{
+			name:      "n = 0",
+			arg:       0,
+			wantCoefs: []float64{1},
+			wantLen:   1,
+			wantDeg:   0,
+		},
+		{
+			name:      "n = 1",
+			arg:       1,
+			wantCoefs: []float64{1, -1},
+			wantLen:   2,
+			wantDeg:   1,
+		},
+		{
+			name:      "n = 2",
+			arg:       2,
+			wantCoefs: []float64{1, -2, 1. / 2},
+			wantLen:   3,
+			wantDeg:   2,
+		},
+		{
+			name:      "n = 3",
+			arg:       3,
+			wantCoefs: []float64{1, -3, 3. / 2, -1. / 6},
+			wantLen:   4,
+			wantDeg:   3,
+		},
+		{
+			name: "n = 10",
+			arg:  10,
+			wantCoefs: []float64{1, -10, 45. / 2, -20, 35. / 4, -21. / 10, 7. / 24, -1. / 42,
+				1. / 896, -1. / 36288, 1. / 3628800},
+			wantLen: 11,
+			wantDeg: 10,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NewPolyLaguerre(tc.arg)
+
+			t.Log(got.Stringn(10))
+
+			assert.Equal(t, tc.wantCoefs, got.coef)
+			assert.Equal(t, tc.wantLen, got.len)
+			assert.Equal(t, tc.wantDeg, got.deg)
+		})
+	}
+}
+
 func Test_PolyProperties(t *testing.T) {
 
 	// Test_Poly the property "getters".
@@ -1254,43 +1384,6 @@ func Test_PolyDiv(t *testing.T) {
 
 			assert.Equal(t, tc.wantQuo, gotQuo)
 			assert.Equal(t, tc.wantRem, gotRem)
-		})
-	}
-}
-
-func Test_PolyDerivative(t *testing.T) {
-	testCases := []struct {
-		name string
-		arg  Poly
-		want Poly
-	}{
-		{
-			name: "zero",
-			arg:  NewPolyZero(),
-			want: NewPolyZero(),
-		},
-		{
-			name: "nonzero const",
-			arg:  NewPoly([]float64{3.1415}),
-			want: NewPolyZero(),
-		},
-		{
-			name: "linear",
-			arg:  NewPoly([]float64{125124, 125123}),
-			want: NewPoly([]float64{125124}),
-		},
-		{
-			name: "quadratic",
-			arg:  NewPoly([]float64{47346346, 734334, 2342366}),
-			want: NewPoly([]float64{47346346 * 2, 734334}),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := tc.arg.Derivative()
-
-			assert.Equal(t, tc.want, got)
 		})
 	}
 }

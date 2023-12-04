@@ -363,6 +363,41 @@ func NewPolyChebyshev2(n int) Poly {
 	return NewPolyLinear(2, 0).Mul(NewPolyChebyshev2(n - 1)).Sub(NewPolyChebyshev2(n - 2))
 }
 
+// NewPolyLegendre returns the nth Legendre polynomial.
+//
+// Panics for negative n.
+func NewPolyLegendre(n int) Poly {
+
+	if n < 0 {
+		log.Panic("NewPolyLegendre: negative n.")
+	}
+
+	// Implement Rodrigues' formula.
+	ddxpn := NewPolyQuadratic(1, 0, -1).Pow(n).DerivativeN(n)
+
+	return ddxpn.MulScalar(1 / (fact(n) * math.Pow(2, float64(n))))
+}
+
+// NewPolyLaguerre returns the nth Laguerre polynomial.
+//
+// Panics for negative n.
+func NewPolyLaguerre(n int) Poly {
+
+	if n < 0 {
+		log.Panic("NewPolyLaguerre: negative n.")
+	}
+
+	coefs := make([]float64, n+1)
+
+	sgn := 1.0
+	for k := 0; k <= n; k++ {
+		coefs[k] = choose(n, k) * sgn / fact(k)
+		sgn *= -1
+	}
+
+	return newPolyNoReverse(coefs)
+}
+
 // Coefficients returns the coefficients c of p ordered in decreasing degree.
 func (p Poly) Coefficients() []float64 {
 
@@ -693,23 +728,6 @@ func (p Poly) Div(q Poly) (Poly, Poly) {
 	remCoef := reverse(quoRemCoef[sep:])
 
 	return newPolyNoReverse(quoCoef), newPolyNoReverse(remCoef)
-}
-
-// Derivative returns the derivative p' of p.
-func (p Poly) Derivative() Poly {
-
-	// p is a constant, whose derivative is always 0.
-	if p.deg == 0 {
-		return NewPoly([]float64{0})
-	}
-
-	// For nonconstant p, if deg(p) = n, then deg(p') = n - 1.
-	derivCoef := make([]float64, p.deg)
-	for i := 0; i < p.deg; i++ {
-		derivCoef[i] = p.coef[i+1] * float64(i+1)
-	}
-
-	return newPolyNoReverse(derivCoef)
 }
 
 // Reciprocal returns the reciprocal p* of p.
