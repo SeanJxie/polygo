@@ -134,6 +134,16 @@ func min(s []float64) float64 {
 	return min
 }
 
+// equalAbs returns true if the absolute error between a and b is at most delta, else false.
+func equalAbs(a, b, delta float64) bool {
+
+	if a == b {
+		return true
+	}
+
+	return math.Abs(a-b) <= delta
+}
+
 // equalRel returns true if the relative error between a and b is at most epsilon, else false.
 func equalRel(a, b, epsilon float64) bool {
 
@@ -141,15 +151,14 @@ func equalRel(a, b, epsilon float64) bool {
 		return true
 	}
 
-	// For a visualization of the error check: https://www.desmos.com/calculator/8bfr35y3k5.
-
-	return math.Abs(a-b)/math.Abs(a+b) <= epsilon
+	// The "true" value is taken to be the smaller one.
+	return math.Abs(a-b)/math.Min(math.Abs(a), math.Abs(b)) <= epsilon
 }
 
 // sign returns the sign of a.
 func sign(a float64) int {
 
-	if a == 0 {
+	if equalRel(a, 0, 0.0001) {
 		return 0
 	}
 

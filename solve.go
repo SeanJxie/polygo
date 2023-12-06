@@ -2,8 +2,106 @@ package polygo
 
 import (
 	"log"
+	"math"
 	"math/rand"
 )
+
+// CauchyBound returns Cauchy's root bound of p.
+//
+// If p(x) = 0, then |x| <= p.CauchyBound().
+//
+// Panics for constant p.
+func (p Poly) CauchyBound() float64 {
+
+	if p.deg == 0 {
+		log.Panic("CauchyBound: constant polynomial.")
+	}
+
+	// Compute Cauchy's bound.
+
+	leadrecip := 1 / p.coef[p.deg]
+	maxi := math.Abs(p.coef[0] * leadrecip)
+	var tmp float64
+
+	for i := 1; i < p.deg; i++ {
+		tmp = math.Abs(p.coef[i] * leadrecip)
+
+		if tmp > maxi {
+			maxi = tmp
+		}
+	}
+
+	return 1 + maxi
+}
+
+// CountSturm returns the number of distinct real roots of p on the interval (a, b].
+func (p Poly) CountSturm(a, b float64) int {
+
+	return cacheSturmChain(p).count(a, b)
+}
+
+// SolveNewtonRaphson implements the Newton-Raphson method for a single root with the intial guess
+// and given number of iterations. An approximated root is returned.
+//
+// Panics for negative iterations.
+func (p Poly) SolveNewtonRaphson(guess float64, iterations int) float64 {
+
+	if iterations < 0 {
+		log.Panicf("SolveNewtonRaphson: negative iterations %d.", iterations)
+	}
+
+	if iterations == 0 {
+		return guess
+	}
+
+	d := p.Derivative()
+	var dvalue float64
+
+	for ; iterations > 0; iterations-- {
+
+		dvalue = d.At(guess)
+
+		if equalAbs(dvalue, 0, 0.001) {
+			// Exit iteration if dvalue is close enough to zero.
+			break
+		}
+
+		guess -= p.At(guess) / dvalue
+	}
+
+	return guess
+}
+
+// SolveBisect returns all distinct real roots of p on the interval [left, right] with given
+// precision.
+//
+// Panics for invalid intervals and negative precision.
+func (p Poly) SolveBisect(left, right, precision float64) float64 {
+
+	if left > right {
+		log.Panicf("SolveBisect: invalid interval [%f, %f].", left, right)
+	}
+
+	if precision < 0 {
+		log.Panicf("SolveBisect: negative precision %f.", precision)
+	}
+
+	var mid float64
+
+	for right-left > bisectPrecision {
+		mid = 0.5 * (left + right)
+
+		if p.CountSturm(left, mid) == 1 {
+			right = mid
+		} else {
+			// If the root doesn't lie on the left-mid side, then it must lie on the
+			// mid-right side.
+			left = mid
+		}
+	}
+
+	return mid
+}
 
 type CountAlgorithm int
 type IsolateAlgorithm int
@@ -25,8 +123,8 @@ const (
 )
 
 var (
-	newtonIterations = 100
-	bisectPrecision  = epsilon
+	newtonIterations = 500
+	bisectPrecision  = 1e-6
 )
 
 func (a CountAlgorithm) String() string {
@@ -55,96 +153,12 @@ func (a SearchAlgorithm) String() string {
 	return "ALG_SEARCH_UNKNOWN"
 }
 
-// sturmChain represents the Sturm chain (or sequence) of a Poly.
-type sturmChain struct {
-	c   []Poly
-	len int
-}
-
-// computeSturmChain computes and caches the Sturm chain of p.
-func new_sturmChain(p Poly) sturmChain {
-
-	// Constant case.
-	if p.deg == 0 {
-		return sturmChain{[]Poly{p}, 1}
-	}
-
-	// Construct Sturm chain.
-	chain := make([]Poly, p.deg+1)
-	chain[0], chain[1] = p, p.Derivative()
-
-	i := 1
-	var rem Poly
-
-	for !chain[i].IsConstant() {
-		_, rem = chain[i-1].Div(chain[i])
-		chain[i+1] = rem.MulScalar(-1)
-		i++
-	}
-
-	// Resize.
-	i++
-	chain = chain[:i]
-
-	return sturmChain{
-		c:   chain,
-		len: i,
-	}
-}
-
-// count returns the number of roots on the half-open interval (a, b] for p associated with s.
-//
-// Panics for invalid intervals.
-func (s sturmChain) count(a, b float64) int {
-
-	if a > b {
-		log.Panicf("count: invalid interval (%f, %f].", a, b)
-	}
-
-	if s.len == 1 {
-		return 0 // No sign changes in one value.
-	}
-
-	chain := s.c
-
-	prevsa := sign(chain[0].At(a))
-	prevsb := sign(chain[0].At(b))
-	var currsa, currsb int
-
-	// Sign change counters.
-	va := 0
-	vb := 0
-
-	for i := 1; i < s.len; i++ {
-		currsa = sign(chain[i].At(a))
-		currsb = sign(chain[i].At(b))
-
-		if currsa != prevsa && prevsa != 0 {
-			va++
-		}
-
-		if currsb != prevsb && prevsb != 0 {
-			vb++
-		}
-
-		prevsa = currsa
-		prevsb = currsb
-	}
-
-	// Hacky fix for when a, b are multiple roots of p.
-	if va-vb < 0 {
-		return 0
-	}
-
-	return va - vb
-}
-
 // HalfOpenInterval represents a half-open interval (L, R].
 type HalfOpenInterval struct {
 	L, R float64
 }
 
-// Solver represents a collection of methods used to solve polynomial equations.
+// Solver represents a collection of methods used to obtain information about polynomial equations.
 type Solver struct {
 	counter  CountAlgorithm
 	isolator IsolateAlgorithm
@@ -235,9 +249,80 @@ func (s Solver) IsolateRootsWithin(p Poly, a, b float64) []HalfOpenInterval {
 	return partition
 }
 
+// solve_linear returns the root of linear p.
+func solve_linear(p Poly) []float64 {
+
+	return []float64{-p.coef[0] / p.coef[1]}
+}
+
+// solve_quadratic returns the real roots of quadratic p.
+func solve_quadratic(p Poly) []float64 {
+
+	c, negb, a := p.coef[0], -p.coef[1], p.coef[2]
+	d := negb*negb - 4*a*c
+	recip := 1 / (2 * a)
+
+	if d > 0 {
+		sqrtd := math.Sqrt(d)
+		return []float64{(negb + sqrtd) * recip, (negb - sqrtd) * recip}
+	}
+
+	if d == 0 {
+		return []float64{negb * recip}
+	}
+
+	return []float64{}
+}
+
+// solve_random_sample_newton returns the approximated roots of p on the interval (left, right].
+func solve_random_sample_newton(p Poly, left, right float64) float64 {
+
+	// Implement Newton-Raphson with random guess sampling.
+
+	pprime := p.Derivative()
+	root := left
+
+	for !(left < root && root <= right) {
+
+		root = left + rand.Float64()*(right-left)
+
+		for i := 0; i < newtonIterations; i++ {
+			fprimeroot := pprime.At(root)
+
+			if fprimeroot == 0 {
+				break
+			}
+
+			root -= p.At(root) / fprimeroot
+		}
+	}
+
+	return root
+}
+
+// solve_bisect returns the approximated roots of p on the interval (left, right].
+func solve_bisect(p Poly, left, right float64, counter func(Poly, float64, float64) int) float64 {
+
+	var mid float64
+
+	for right-left > bisectPrecision {
+		mid = 0.5 * (left + right)
+
+		if counter(p, left, mid) == 1 {
+			right = mid
+		} else {
+			// If the root doesn't lie on the left-mid side, then it must lie on the
+			// mid-right side.
+			left = mid
+		}
+	}
+
+	return mid
+}
+
 // FindRootsWithin returns the distinct roots of p on the half-open interval (a, b].
 //
-// Panics for invalid intervals.
+// Panics for invalid intervals and infinite solutions.
 func (s Solver) FindRootsWithin(p Poly, a, b float64) []float64 {
 
 	if b < a {
@@ -248,7 +333,19 @@ func (s Solver) FindRootsWithin(p Poly, a, b float64) []float64 {
 
 	// For deg(p) = 0, 1, 2, just solve exactly.
 	if p.deg == 0 {
+		if p.coef[0] == 0 {
+			log.Panicf("FindRootsWithin: infinite solutions for %v.", p)
+		}
+		return []float64{}
+	}
 
+	// TODO: Check bounds a, b.
+	if p.deg == 1 {
+		return solve_linear(p)
+	}
+
+	if p.deg == 2 {
+		return solve_quadratic(p)
 	}
 
 	intervals := s.IsolateRootsWithin(p, a, b)
@@ -257,59 +354,14 @@ func (s Solver) FindRootsWithin(p Poly, a, b float64) []float64 {
 
 	case ALG_SEARCH_NEWTON:
 
-		// Implement Newton-Raphson with random guess sampling.
-
-		fprime := p.Derivative()
-
-		var root, fprimeroot, left, right float64
-
 		for _, h := range intervals {
-
-			left, right = h.L, h.R
-
-		random_sample_newton:
-
-			// Random sample on interval.
-			root = left + rand.Float64()*(right-left)
-
-			for i := 0; i < newtonIterations; i++ {
-				fprimeroot = fprime.At(root)
-
-				if fprimeroot == 0 {
-					break
-				}
-
-				root -= p.At(root) / fprimeroot
-			}
-
-			// Excluding root found outside of interval.
-			if !(left < root && root <= right) {
-				goto random_sample_newton
-			}
-
-			roots = append(roots, root)
+			roots = append(roots, solve_random_sample_newton(p, h.L, h.R))
 		}
 
 	case ALG_SEARCH_BISECT:
 
-		var left, right, mid float64
-
 		for _, h := range intervals {
-			left, right = h.L, h.R
-
-			for right-left > bisectPrecision {
-				mid = 0.5 * (left + right)
-
-				if s.CountRootsWithin(p, left, mid) == 1 {
-					right = mid
-				} else {
-					// If the root doesn't lie on the left-mid side, then it must lie on the
-					// mid-right side.
-					left = mid
-				}
-			}
-
-			roots = append(roots, mid)
+			roots = append(roots, solve_bisect(p, h.L, h.R, s.CountRootsWithin))
 		}
 	}
 

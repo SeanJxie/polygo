@@ -8,6 +8,7 @@ func (p Poly) Derivative() Poly {
 		return NewPoly([]float64{0})
 	}
 
+	// Formal derivative.
 	// For nonconstant p, if deg(p) = n, then deg(p') = n - 1.
 	derivCoef := make([]float64, p.deg)
 	for i := 0; i < p.deg; i++ {

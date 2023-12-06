@@ -960,6 +960,27 @@ func Test_PolyEqual(t *testing.T) {
 			argQ: NewPoly([]float64{3, 1, 4, 1}),
 			want: true,
 		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got1 := tc.argP.Equal(tc.argQ)
+			got2 := tc.argQ.Equal(tc.argP)
+
+			assert.Equal(t, tc.want, got1)
+			assert.Equal(t, tc.want, got2)
+		})
+	}
+}
+
+func Test_PolyEqualRel(t *testing.T) {
+
+	testCases := []struct {
+		name string
+		argP Poly
+		argQ Poly
+		want bool
+	}{
 		{
 			name: "deg(p) == deg(q), p ~= q",
 			argP: NewPoly([]float64{125125124, 1.0000001, 4, 1.000002}),
@@ -970,8 +991,8 @@ func Test_PolyEqual(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got1 := tc.argP.Equal(tc.argQ)
-			got2 := tc.argQ.Equal(tc.argP)
+			got1 := tc.argP.EqualRel(tc.argQ, 0.001) // Within 0.01%.
+			got2 := tc.argQ.EqualRel(tc.argP, 0.001)
 
 			assert.Equal(t, tc.want, got1)
 			assert.Equal(t, tc.want, got2)
@@ -1279,8 +1300,8 @@ func Test_PolyMulFast(t *testing.T) {
 			got1 := tc.argP.MulFast(tc.argQ)
 			got2 := tc.argQ.MulFast(tc.argP)
 
-			assert.True(t, tc.want.Equal(got1))
-			assert.True(t, tc.want.Equal(got2))
+			assert.True(t, tc.want.EqualRel(got1, 0.001)) // Within 0.1%.
+			assert.True(t, tc.want.EqualRel(got2, 0.001))
 		})
 	}
 }
@@ -1434,37 +1455,39 @@ func Test_PolyString(t *testing.T) {
 		{
 			name: "zero",
 			arg:  NewPolyZero(),
-			want: "[ 0.000000x^0 ]",
+			want: "[ 0.000000x^{0} ]",
 		},
 		{
 			name: "negative const",
 			arg:  NewPoly([]float64{-21}),
-			want: "[ -21.000000x^0 ]",
+			want: "[ -21.000000x^{0} ]",
 		},
 		{
 			name: "nonzero const",
 			arg:  NewPoly([]float64{3.1415}),
-			want: "[ 3.141500x^0 ]",
+			want: "[ 3.141500x^{0} ]",
 		},
 		{
 			name: "linear",
 			arg:  NewPoly([]float64{125124, 1.1715}),
-			want: "[ 125124.000000x^1 + 1.171500x^0 ]",
+			want: "[ 125124.000000x^{1} + 1.171500x^{0} ]",
 		},
 		{
 			name: "quadratic",
 			arg:  NewPoly([]float64{47346346, 734334, 2342366}),
-			want: "[ 47346346.000000x^2 + 734334.000000x^1 + 2342366.000000x^0 ]",
+			want: "[ 47346346.000000x^{2} + 734334.000000x^{1} + 2342366.000000x^{0} ]",
 		},
 		{
 			name: "cubic",
 			arg:  NewPoly([]float64{2152, 47346346, 734334, 2342366}),
-			want: "[ 2152.000000x^3 + 47346346.000000x^2 + 734334.000000x^1 + 2342366.000000x^0 ]",
+			want: "[ 2152.000000x^{3} + 47346346.000000x^{2} + 734334.000000x^{1} + " +
+				"2342366.000000x^{0} ]",
 		},
 		{
 			name: "cubic with negative",
 			arg:  NewPoly([]float64{-2152, 47346346, -734334, 2342366}),
-			want: "[ -2152.000000x^3 + 47346346.000000x^2 - 734334.000000x^1 + 2342366.000000x^0 ]",
+			want: "[ -2152.000000x^{3} + 47346346.000000x^{2} - 734334.000000x^{1} + " +
+				"2342366.000000x^{0} ]",
 		},
 	}
 

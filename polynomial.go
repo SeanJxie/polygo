@@ -448,7 +448,7 @@ func (p Poly) Equal(q Poly) bool {
 	}
 
 	for i := 0; i < p.len; i++ {
-		if p.coef[i] == q.coef[i] {
+		if p.coef[i] != q.coef[i] {
 			return false
 		}
 	}
@@ -465,7 +465,7 @@ func (p Poly) EqualRel(q Poly, epsilon float64) bool {
 	}
 
 	for i := 0; i < p.len; i++ {
-		if equalRel(p.coef[i], q.coef[i], epsilon) {
+		if !equalRel(p.coef[i], q.coef[i], epsilon) {
 			return false
 		}
 	}
@@ -503,6 +503,12 @@ func (p Poly) IsMonic() bool {
 func (p Poly) IsMonicRel(epsilon float64) bool {
 
 	return equalRel(p.coef[p.deg], 1, epsilon)
+}
+
+// Monic returns a monic polynomial by dividing each coefficient in p by the lead coefficient.
+func (p Poly) Monic() Poly {
+
+	return p.MulScalar(1 / p.coef[p.deg])
 }
 
 // At returns the value of p evaluated at x.
@@ -730,7 +736,7 @@ func (p Poly) Div(q Poly) (Poly, Poly) {
 	return newPolyNoReverse(quoCoef), newPolyNoReverse(remCoef)
 }
 
-// Reciprocal returns the reciprocal p* of p.
+// Reciprocal returns the reciprocal polynomial p* of p.
 func (p Poly) Reciprocal() Poly {
 
 	// Since we reverse the user's coefficient slice in NewPoly(), we just pass
@@ -815,7 +821,7 @@ func (p Poly) Printn(n int) {
 // id returns a unqiue identifier for p.
 func (p Poly) id() uint32 {
 
-	// Generate unqiue string and hash.
+	// Generate a unqiue string and hash it.
 
 	var sb strings.Builder
 
